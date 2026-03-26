@@ -100,27 +100,38 @@ export default function App() {
   }
 
   async function loadLatestApiData() {
-    try {
-      setError("");
+  try {
+    setError("");
 
-      const res = await fetch("http://localhost:5174/api/latest", {
-        method: "GET",
-        credentials: "include",
-      });
+    // Zeitraum definieren (z.B. die letzten 7 Tage oder festes Datum)
+    const startDate = "2022-01-01";
+    const endDate = "2026-03-27";
 
-      const json = await res.json();
+    // URL mit Query-Parametern für deine Python-API
+    const url = `http://seiz.ing/orders?start_date=${startDate}&end_date=${endDate}`;
 
-      if (!res.ok || !json.ok) {
-        setError(json?.message || "API-Daten konnten nicht geladen werden.");
-        return;
-      }
+    const res = await fetch(url, {
+      method: "GET",
+      // credentials: "include" nur lassen, wenn du wirklich Cookies/Auth nutzt
+    });
 
-      const normalized = normalizeApiFacts(json.data);
-      onFactsLoaded(normalized);
-    } catch (err) {
-      setError("Fehler beim Laden der letzten API-Daten.");
+    if (!res.ok) {
+      const errorJson = await res.json();
+      setError(errorJson?.detail || "API-Daten konnten nicht geladen werden.");
+      return;
     }
+
+    const data = await res.json();
+    
+    // Da deine API direkt eine Liste [{}, {}] zurückgibt:
+    const normalized = normalizeApiFacts(data);
+    onFactsLoaded(normalized);
+
+  } catch (err) {
+    console.error(err);
+    setError("Fehler beim Laden der letzten API-Daten.");
   }
+}
 
   async function generateApiData() {
     try {
