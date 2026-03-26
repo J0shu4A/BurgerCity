@@ -23,10 +23,16 @@ export function revenueByYear(dailyRows) {
     .map(Number)
     .sort((a, b) => a - b);
 
-  return years.map((year) => ({
-    year,
-    revenue: sum(grouped[year], (r) => r.revenue),
-  }));
+  return years.map((year) => {
+    const totalRevenue = sum(grouped[year], (r) => r.revenue);
+    
+    return {
+      year,
+      revenue: totalRevenue,
+      // HIER NEU: Simpler Durchschnittswert (z.B. 12.5% Marge) für das Chart
+      profit: totalRevenue * 0.125, 
+    };
+  });
 }
 
 export function ytdRevenue(dailyRows) {

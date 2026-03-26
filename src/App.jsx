@@ -26,7 +26,7 @@ import { buildAlerts } from "./lib/alerts";
 
 import YearRevenueChart from "./components/YearRevenueChart";
 import { computeYearKpis } from "./lib/yearanalytics";
-
+import { calculateTotalProfit } from "./lib/profit";
 import NewLocationPlanner from "./components/NewLocationPlanner";
 
 import {
@@ -105,7 +105,7 @@ export default function App() {
     setError("");
 
     // Zeitraum definieren (z.B. die letzten 7 Tage oder festes Datum)
-    const startDate = "2022-01-01";
+    const startDate = "2023-01-01";
     const endDate = "2026-03-27";
 
     // URL mit Query-Parametern für deine Python-API
@@ -170,6 +170,11 @@ export default function App() {
     () => filterFacts(factsRaw, { store, fromDate, toDate }),
     [factsRaw, store, fromDate, toDate]
   );
+ 
+  
+
+  
+ 
 
   const kpis = useMemo(() => computeKpis(facts), [facts]);
 
@@ -200,6 +205,26 @@ export default function App() {
     () => computeYearKpis(chartDayForYear),
     [chartDayForYear]
   );
+  // 1. WICHTIG: totalProfit MUSS hier im Code bleiben, auch wenn wir unten ytdProfit anzeigen
+  const totalProfit = useMemo(() => calculateTotalProfit(facts || []), [facts]);
+
+  // 2. Der kugelsichere YTD Profit
+  const ytdProfit = useMemo(() => {
+    // Sicherheits-Check: Wenn keine Daten da sind, sofort abbrechen
+    if (!facts || facts.length === 0 || !yearKpis?.ytdRevenue) return 0;
+
+    // Umsatz ganz simpel und sicher aufsummieren
+    let totalRev = 0;
+    facts.forEach(r => {
+      totalRev += Number(r.revenue || 0);
+    });
+
+    // Division durch 0 strikt verhindern
+    const avgMargin = totalRev > 0 ? (totalProfit / totalRev) : 0.12; 
+    
+    return yearKpis.ytdRevenue * avgMargin;
+  }, [facts, totalProfit, yearKpis?.ytdRevenue]);
+  
 
   const alerts = useMemo(() => {
     return buildAlerts(chartDayForYear, {
@@ -493,6 +518,16 @@ export default function App() {
           </div>
 
           <div className="basketStat">
+            <div className="label">YTD Gewinn</div>
+            <div className="value" style={{ color: "#10b981" }}>
+              {new Intl.NumberFormat("de-DE", {
+                style: "currency",
+                currency: "EUR",
+              }).format(ytdProfit || 0)}
+            </div>
+          </div>
+
+          <div className="basketStat">
             <div className="label">Umsatz Vorjahr</div>
             <div className="value">
               {new Intl.NumberFormat("de-DE", {
@@ -635,7 +670,7 @@ export default function App() {
       />
     </>
   );
-  }
+}
 
   function renderSalesMarketingPanel() {
   return (
