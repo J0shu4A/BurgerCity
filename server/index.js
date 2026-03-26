@@ -7,7 +7,6 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const path = require("path");
 
-const { generateOrders, STORES } = require("./dataGenerator");
 
 const app = express();
 

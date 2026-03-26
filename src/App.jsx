@@ -43,6 +43,7 @@ import {
   basketKpis,
   performanceByStore,
   insights,
+  marketingInsights,
 } from "./lib/metrics";
 
 export default function App() {
@@ -179,6 +180,7 @@ export default function App() {
   const chartStores = useMemo(() => storeRanking(facts), [facts]);
   const chartBundles = useMemo(() => topBundles(facts, 10), [facts]);
   const insightItems = useMemo(() => insights(facts), [facts]);
+  const marketingInsightItems = useMemo(() => marketingInsights(facts), [facts]);
 
   const chartBasket = useMemo(() => basketByHour(facts), [facts]);
   const basketSummary = useMemo(() => basketKpis(facts), [facts]);
@@ -468,191 +470,64 @@ export default function App() {
   }
 
   function renderOverviewPanel() {
-    return (
-      <>
-        {renderCommonHeader(
-          "Eroglu Control",
-          "Performance Monitoring • Umsatzanalyse • Forecasting",
-          true
-        )}
+  return (
+    <>
+      {renderCommonHeader(
+        "Eroglu Control",
+        "Performance Monitoring • Umsatzanalyse • Forecasting",
+        true
+      )}
 
-        <KpiCards kpis={kpis} />
+      <KpiCards kpis={kpis} />
 
-        {factsRaw.length > 0 && (
-          <div className="card basketSummary">
-            <div className="basketStat">
-              <div className="label">YTD Umsatz</div>
-              <div className="value">
-                {new Intl.NumberFormat("de-DE", {
-                  style: "currency",
-                  currency: "EUR",
-                }).format(yearKpis?.ytdRevenue || 0)}
-              </div>
-            </div>
-
-            <div className="basketStat">
-              <div className="label">Umsatz Vorjahr</div>
-              <div className="value">
-                {new Intl.NumberFormat("de-DE", {
-                  style: "currency",
-                  currency: "EUR",
-                }).format(yearKpis?.lastYearRevenue || 0)}
-              </div>
-            </div>
-
-            <div className="basketStat">
-              <div className="label">YoY Wachstum</div>
-              <div className="value">
-                {yearKpis?.yoy == null
-                  ? "-"
-                  : `${(yearKpis.yoy * 100).toFixed(1)}%`}
-              </div>
+      {factsRaw.length > 0 && (
+        <div className="card basketSummary">
+          <div className="basketStat">
+            <div className="label">YTD Umsatz</div>
+            <div className="value">
+              {new Intl.NumberFormat("de-DE", {
+                style: "currency",
+                currency: "EUR",
+              }).format(yearKpis?.ytdRevenue || 0)}
             </div>
           </div>
-        )}
 
-        {basketSummary?.orders !== undefined && (
-          <div
-            className="card"
-            style={{
-              display: "flex",
-              gap: 16,
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <div className="label">Orders</div>
-              <div className="value">{basketSummary.orders}</div>
-            </div>
-            <div>
-              <div className="label">AOV</div>
-              <div className="value">
-                {new Intl.NumberFormat("de-DE", {
-                  style: "currency",
-                  currency: "EUR",
-                }).format(basketSummary.aov || 0)}
-              </div>
-            </div>
-            <div>
-              <div className="label">Bundle-Quote</div>
-              <div className="value">
-                {Math.round((basketSummary.bundleRate || 0) * 100)}%
-              </div>
+          <div className="basketStat">
+            <div className="label">Umsatz Vorjahr</div>
+            <div className="value">
+              {new Intl.NumberFormat("de-DE", {
+                style: "currency",
+                currency: "EUR",
+              }).format(yearKpis?.lastYearRevenue || 0)}
             </div>
           </div>
-        )}
 
-        <div className="mainLayout">
-          <AlertsSidebar alerts={alerts} />
-
-          <div className="mainContent">
-            <ChartTabs active={activeChart} onChange={setActiveChart} />
-
-            <div className="chartContainer">
-              {activeChart === "day" && (
-                <div className="chartSlot">
-                  <RevenueChart data={chartDayRaw} />
-                </div>
-              )}
-
-              {activeChart === "hour" && (
-                <div className="chartSlot">
-                  <HourRevenueChart data={chartHour} />
-                </div>
-              )}
-
-              {activeChart === "year" && (
-                <div className="chartSlot">
-                  <YearRevenueChart data={yearKpis?.yearlySeries || []} />
-                </div>
-              )}
-
-              {activeChart === "products" && (
-                <div className="chartSlot">
-                  <TopProductsChart data={chartProducts} />
-                </div>
-              )}
-
-              {activeChart === "stores" && (
-                <div className="chartSlot">
-                  <StoreRanking data={chartStores} />
-                </div>
-              )}
-
-              {activeChart === "bundles" && (
-                <div className="chartSlot">
-                  <BundlesChart data={chartBundles} />
-                </div>
-              )}
-
-              {activeChart === "forecast" && (
-                <div className="chartSlot">
-                  <ForecastChart facts={facts} />
-                </div>
-              )}
-
-              {activeChart === "forecastplus" && (
-                <div className="chartSlot">
-                  <ForecastPlus facts={facts} />
-                </div>
-              )}
-
-              {activeChart === "basket" && (
-                <div className="chartSlot">
-                  <BasketAnalysisChart data={chartBasket} />
-                </div>
-              )}
-
-              {activeChart === "performance" && (
-                <div className="chartSlot">
-                  <PerformanceChart data={chartPerformance} />
-                </div>
-              )}
-
-              {activeChart === "insights" && (
-                <div className="chartSlot">
-                  <InsightsPanel items={insightItems} />
-                </div>
-              )}
+          <div className="basketStat">
+            <div className="label">YoY Wachstum</div>
+            <div className="value">
+              {yearKpis?.yoy == null
+                ? "-"
+                : `${(yearKpis.yoy * 100).toFixed(1)}%`}
             </div>
           </div>
         </div>
+      )}
 
-        <footer className="footer">
-          <span>Eroglu Control • Data-driven Performance Steering</span>
-        </footer>
-
-        <NewLocationPlanner
-          open={plannerOpen}
-          onClose={() => setPlannerOpen(false)}
-          facts={facts}
-        />
-      </>
-    );
-  }
-
-  function renderSalesMarketingPanel() {
-    return (
-      <>
-        {renderCommonHeader(
-          "Sales & Marketing Panel",
-          "Produktfokus • Vertrieb • Kampagnenansätze • Upsell",
-          false
-        )}
-
-        <div className="card basketSummary">
-          <div className="basketStat">
-            <div className="label">Top Produkt</div>
-            <div className="value">{chartProducts[0]?.product || "—"}</div>
+      {basketSummary?.orders !== undefined && (
+        <div
+          className="card"
+          style={{
+            display: "flex",
+            gap: 16,
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div className="label">Orders</div>
+            <div className="value">{basketSummary.orders}</div>
           </div>
-
-          <div className="basketStat">
-            <div className="label">Top Bundle</div>
-            <div className="value">{chartBundles[0]?.bundle || "—"}</div>
-          </div>
-
-          <div className="basketStat">
+          <div>
             <div className="label">AOV</div>
             <div className="value">
               {new Intl.NumberFormat("de-DE", {
@@ -661,70 +536,203 @@ export default function App() {
               }).format(basketSummary.aov || 0)}
             </div>
           </div>
+          <div>
+            <div className="label">Bundle-Quote</div>
+            <div className="value">
+              {Math.round((basketSummary.bundleRate || 0) * 100)}%
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mainLayout">
+        <AlertsSidebar alerts={alerts} />
+
+        <div className="mainContent">
+          <ChartTabs active={activeChart} onChange={setActiveChart} />
+
+          <div className="chartContainer">
+            {activeChart === "day" && (
+              <div className="chartSlot">
+                <RevenueChart data={chartDayRaw} />
+              </div>
+            )}
+
+            {activeChart === "hour" && (
+              <div className="chartSlot">
+                <HourRevenueChart data={chartHour} />
+              </div>
+            )}
+
+            {activeChart === "year" && (
+              <div className="chartSlot">
+                <YearRevenueChart data={yearKpis?.yearlySeries || []} />
+              </div>
+            )}
+
+            {activeChart === "products" && (
+              <div className="chartSlot">
+                <TopProductsChart data={chartProducts} />
+              </div>
+            )}
+
+            {activeChart === "stores" && (
+              <div className="chartSlot">
+                <StoreRanking data={chartStores} />
+              </div>
+            )}
+
+            {activeChart === "bundles" && (
+              <div className="chartSlot">
+                <BundlesChart data={chartBundles} />
+              </div>
+            )}
+
+            {activeChart === "forecast" && (
+              <div className="chartSlot">
+                <ForecastChart facts={facts} />
+              </div>
+            )}
+
+            {activeChart === "forecastplus" && (
+              <div className="chartSlot">
+                <ForecastPlus facts={facts} />
+              </div>
+            )}
+
+            {activeChart === "basket" && (
+              <div className="chartSlot">
+                <BasketAnalysisChart data={chartBasket} />
+              </div>
+            )}
+
+            {activeChart === "performance" && (
+              <div className="chartSlot">
+                <PerformanceChart data={chartPerformance} />
+              </div>
+            )}
+
+            {activeChart === "insights" && (
+              <div className="chartSlot">
+                <InsightsPanel
+                  items={insightItems}
+                  title="Insights (automatische Empfehlungen zur Umsatzsteigerung)"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <footer className="footer">
+        <span>Eroglu Control • Data-driven Performance Steering</span>
+      </footer>
+
+      <NewLocationPlanner
+        open={plannerOpen}
+        onClose={() => setPlannerOpen(false)}
+        facts={facts}
+      />
+    </>
+  );
+  }
+
+  function renderSalesMarketingPanel() {
+  return (
+    <>
+      {renderCommonHeader(
+        "Sales & Marketing Panel",
+        "Produktfokus • Vertrieb • Kampagnenansätze • Upsell",
+        false
+      )}
+
+      <div className="card basketSummary">
+        <div className="basketStat">
+          <div className="label">Top Produkt</div>
+          <div className="value">{chartProducts[0]?.product || "—"}</div>
         </div>
 
-        <div className="tabs">
-          <button
-            className={`tabBtn ${salesTab === "products" ? "active" : ""}`}
-            onClick={() => setSalesTab("products")}
-            type="button"
-          >
-            Produkte
-          </button>
-          <button
-            className={`tabBtn ${salesTab === "bundles" ? "active" : ""}`}
-            onClick={() => setSalesTab("bundles")}
-            type="button"
-          >
-            Bundles
-          </button>
-          <button
-            className={`tabBtn ${salesTab === "hour" ? "active" : ""}`}
-            onClick={() => setSalesTab("hour")}
-            type="button"
-          >
-            Peak Hours
-          </button>
-          <button
-            className={`tabBtn ${salesTab === "insights" ? "active" : ""}`}
-            onClick={() => setSalesTab("insights")}
-            type="button"
-          >
-            Marketing Insights
-          </button>
+        <div className="basketStat">
+          <div className="label">Top Bundle</div>
+          <div className="value">{chartBundles[0]?.bundle || "—"}</div>
         </div>
 
-        <div className="chartContainer">
-          {salesTab === "products" && (
-            <div className="chartSlot">
-              <TopProductsChart data={chartProducts} />
-            </div>
-          )}
-
-          {salesTab === "bundles" && (
-            <div className="chartSlot">
-              <BundlesChart data={chartBundles} />
-            </div>
-          )}
-
-          {salesTab === "hour" && (
-            <div className="chartSlot">
-              <HourRevenueChart data={chartHour} />
-            </div>
-          )}
-
-          {salesTab === "insights" && (
-            <div className="chartSlot">
-              <InsightsPanel items={insightItems} />
-            </div>
-          )}
+        <div className="basketStat">
+          <div className="label">AOV</div>
+          <div className="value">
+            {new Intl.NumberFormat("de-DE", {
+              style: "currency",
+              currency: "EUR",
+            }).format(basketSummary.aov || 0)}
+          </div>
         </div>
+      </div>
 
-        <footer className="footer">
-          <span>Sales & Marketing Panel • Campaign & Conversion Focus</span>
-        </footer>
-      </>
-    );
+      <div className="tabs">
+        <button
+          className={`tabBtn ${salesTab === "products" ? "active" : ""}`}
+          onClick={() => setSalesTab("products")}
+          type="button"
+        >
+          Produkte
+        </button>
+        <button
+          className={`tabBtn ${salesTab === "bundles" ? "active" : ""}`}
+          onClick={() => setSalesTab("bundles")}
+          type="button"
+        >
+          Bundles
+        </button>
+        <button
+          className={`tabBtn ${salesTab === "hour" ? "active" : ""}`}
+          onClick={() => setSalesTab("hour")}
+          type="button"
+        >
+          Peak Hours
+        </button>
+        <button
+          className={`tabBtn ${salesTab === "insights" ? "active" : ""}`}
+          onClick={() => setSalesTab("insights")}
+          type="button"
+        >
+          Marketing Insights
+        </button>
+      </div>
+
+      <div className="chartContainer">
+        {salesTab === "products" && (
+          <div className="chartSlot">
+            <TopProductsChart data={chartProducts} />
+          </div>
+        )}
+
+        {salesTab === "bundles" && (
+          <div className="chartSlot">
+            <BundlesChart data={chartBundles} />
+          </div>
+        )}
+
+        {salesTab === "hour" && (
+          <div className="chartSlot">
+            <HourRevenueChart data={chartHour} />
+          </div>
+        )}
+
+        {salesTab === "insights" && (
+          <div className="chartSlot">
+            <InsightsPanel
+              items={marketingInsightItems}
+              title="Marketing & Sales Insights"
+            />
+          </div>
+        )}
+      </div>
+
+      <footer className="footer">
+        <span>Sales & Marketing Panel • Campaign & Conversion Focus</span>
+      </footer>
+    </>
+  );
   }
 
   return (

@@ -25,6 +25,21 @@ function isBundleOrder(lines) {
   return set.size >= 2;
 }
 
+function safeNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatHourLabel(hour) {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function priorityWeight(priority) {
+  if (priority === "Hoch") return 3;
+  if (priority === "Mittel") return 2;
+  return 1;
+}
+
 /* =========================================
    Basic Helpers
 ========================================= */
@@ -426,4 +441,227 @@ export function insights(facts) {
   }
 
   return items.slice(0, 6);
+}
+
+/* =========================================
+   Marketing & Sales Insights
+========================================= */
+
+export function marketingInsights(facts) {
+  if (!facts || facts.length === 0) return [];
+
+  const result = [];
+
+  const totalRevenue = facts.reduce((sum, f) => sum + revenueOf(f), 0);
+  const totalQty = facts.reduce((sum, f) => sum + safeNum(f.qty), 0);
+
+  const hourData = revenueByHour(facts).filter((h) => h.revenue > 0);
+  const productData = topProductsByRevenue(facts, 10);
+  const storeData = storeRanking(facts);
+  const bundleData = topBundles(facts, 10);
+  const basket = basketKpis(facts);
+
+  const categoryMap = new Map();
+  for (const f of facts) {
+    const category = String(f.category || "Unbekannt").trim();
+    categoryMap.set(category, (categoryMap.get(category) || 0) + revenueOf(f));
+  }
+
+  const categoryData = Array.from(categoryMap.entries())
+    .map(([category, revenue]) => ({
+      category,
+      revenue: Number(revenue.toFixed(2)),
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  if (hourData.length) {
+    const bestHour = [...hourData].sort((a, b) => b.revenue - a.revenue)[0];
+    const weakestHour = [...hourData].sort((a, b) => a.revenue - b.revenue)[0];
+    const avgHourRevenue =
+      hourData.reduce((sum, h) => sum + h.revenue, 0) / hourData.length;
+
+    if (bestHour && bestHour.revenue > avgHourRevenue * 1.2) {
+      result.push({
+        type: "opportunity",
+        category: "Marketing",
+        priority: "Hoch",
+        title: "Peak Hour mit hohem Kampagnenpotenzial",
+        text: `Um ${formatHourLabel(
+          bestHour.hour
+        )} wird deutlich mehr Umsatz als im Stundendurchschnitt erzielt.`,
+        recommendation:
+          "Schalte zeitgesteuerte Promotions, Ads oder Push-Angebote bevorzugt rund um dieses Zeitfenster.",
+      });
+    }
+
+    if (weakestHour && weakestHour.revenue < avgHourRevenue * 0.75) {
+      result.push({
+        type: "info",
+        category: "Marketing",
+        priority: "Mittel",
+        title: "Schwaches Zeitfenster identifiziert",
+        text: `Um ${formatHourLabel(
+          weakestHour.hour
+        )} ist der Umsatz im Vergleich zu anderen Stunden besonders niedrig.`,
+        recommendation:
+          "Teste hier Happy-Hour-Angebote, Coupons oder lokale Aktionen zur Nachfrageaktivierung.",
+      });
+    }
+  }
+
+  if (productData.length) {
+    const topProduct = productData[0];
+    const productShare = totalRevenue > 0 ? topProduct.revenue / totalRevenue : 0;
+
+    if (productShare >= 0.3) {
+      result.push({
+        type: "warning",
+        category: "Sales",
+        priority: "Hoch",
+        title: "Starke Abhängigkeit von einem Umsatztreiber",
+        text: `${topProduct.product} steht für ${Math.round(
+          productShare * 100
+        )}% des Gesamtumsatzes.`,
+        recommendation:
+          "Top-Produkt weiter bewerben, aber zusätzlich Alternativen über Bundles und Cross-Selling aufbauen.",
+      });
+    } else {
+      result.push({
+        type: "success",
+        category: "Sales",
+        priority: "Niedrig",
+        title: "Umsatz auf mehrere Produkte verteilt",
+        text: "Kein einzelnes Produkt dominiert den Umsatz übermäßig stark.",
+        recommendation:
+          "Mehrprodukt-Kampagnen und Sortimentskommunikation weiter ausbauen.",
+      });
+    }
+  }
+
+  if (categoryData.length) {
+    const topCategory = categoryData[0];
+    const categoryShare = totalRevenue > 0 ? topCategory.revenue / totalRevenue : 0;
+
+    result.push({
+      type: "info",
+      category: "Sales",
+      priority: "Mittel",
+      title: "Umsatzstärkste Kategorie erkannt",
+      text: `Die Kategorie ${topCategory.category} erzielt aktuell ${Math.round(
+        categoryShare * 100
+      )}% des Gesamtumsatzes.`,
+      recommendation:
+        "Diese Kategorie in Kampagnen, auf Bannern und in Bundle-Angeboten besonders prominent platzieren.",
+    });
+  }
+
+  if (basket.orders > 0) {
+    if (basket.bundleRate < 0.35) {
+      result.push({
+        type: "opportunity",
+        category: "Sales",
+        priority: "Hoch",
+        title: "Niedrige Bundle-Quote",
+        text: `Nur ${(basket.bundleRate * 100).toFixed(
+          1
+        )}% der Bestellungen enthalten mehrere Produkte.`,
+        recommendation:
+          "Bundles, Menü-Angebote und Add-ons stärker im Checkout und an den Hauptkontaktpunkten hervorheben.",
+      });
+    } else {
+      result.push({
+        type: "success",
+        category: "Sales",
+        priority: "Mittel",
+        title: "Bundle-Quote auf gutem Niveau",
+        text: `${(basket.bundleRate * 100).toFixed(
+          1
+        )}% der Bestellungen enthalten mehrere Produkte.`,
+        recommendation:
+          "Erfolgreiche Produktkombinationen weiter bewerben und als Standard-Angebote ausbauen.",
+      });
+    }
+
+    if (basket.aov < 12) {
+      result.push({
+        type: "warning",
+        category: "Sales",
+        priority: "Hoch",
+        title: "Niedriger durchschnittlicher Bestellwert",
+        text: `Der aktuelle AOV liegt bei ${basket.aov.toFixed(2)} €.`,
+        recommendation:
+          "Setze auf Upselling mit Extras, Premium-Versionen und Mindestbestellwert-Aktionen.",
+      });
+    } else if (basket.aov < 18) {
+      result.push({
+        type: "info",
+        category: "Sales",
+        priority: "Mittel",
+        title: "Solider Bestellwert mit Ausbaupotenzial",
+        text: `Der durchschnittliche Bestellwert liegt bei ${basket.aov.toFixed(2)} €.`,
+        recommendation:
+          "Add-ons, Menüs und Produktempfehlungen können den Warenkorb weiter erhöhen.",
+      });
+    } else {
+      result.push({
+        type: "success",
+        category: "Sales",
+        priority: "Niedrig",
+        title: "Starker durchschnittlicher Bestellwert",
+        text: `Der durchschnittliche Bestellwert liegt bei ${basket.aov.toFixed(2)} €.`,
+        recommendation:
+          "Premium-Produkte und margenstarke Zusatzartikel weiter aktiv vermarkten.",
+      });
+    }
+  }
+
+  if (storeData.length >= 2) {
+    const bestStore = storeData[0];
+    const worstStore = storeData[storeData.length - 1];
+
+    if (bestStore.revenue > worstStore.revenue * 1.5) {
+      result.push({
+        type: "opportunity",
+        category: "Sales",
+        priority: "Mittel",
+        title: "Deutliche Unterschiede zwischen Filialen",
+        text: `${bestStore.store} performt beim Umsatz klar stärker als ${worstStore.store}.`,
+        recommendation:
+          "Sortiment, Promotions und Peak-Hour-Strategien der Top-Filiale auf schwächere Standorte übertragen.",
+      });
+    }
+  }
+
+  if (bundleData.length) {
+    const bestBundle = bundleData[0];
+    result.push({
+      type: "info",
+      category: "Sales",
+      priority: "Niedrig",
+      title: "Bestes Bundle für Promotions gefunden",
+      text: `Die Kombination "${bestBundle.bundle}" wurde ${bestBundle.count} Mal gemeinsam verkauft.`,
+      recommendation:
+        "Dieses Bundle als Menü, Aktion oder Empfehlung im Sales-&-Marketing-Panel hervorheben.",
+    });
+  }
+
+  if (totalQty > 0) {
+    const avgRevenuePerUnit = totalRevenue / totalQty;
+
+    result.push({
+      type: "info",
+      category: "Marketing",
+      priority: "Niedrig",
+      title: "Absatz- und Preisniveau im Blick",
+      text: `Es wurden ${totalQty} Einheiten mit durchschnittlich ${avgRevenuePerUnit.toFixed(
+        2
+      )} € Umsatz pro Einheit verkauft.`,
+      recommendation:
+        "Produkte mit hohem Absatz und stabiler Marge priorisiert in Kampagnen einsetzen.",
+    });
+  }
+
+  return result
+    .sort((a, b) => priorityWeight(b.priority) - priorityWeight(a.priority))
+    .slice(0, 8);
 }

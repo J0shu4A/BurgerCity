@@ -277,33 +277,96 @@ input[type="file"] {
   opacity: 0.7;
 }
 
-/* Insights */
+/* ===== Insights ===== */
 .insights {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 6px;
+  gap: 14px;
+  margin-top: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  padding-bottom: 8px;
 }
 
 .insight {
-  background: rgba(0,0,0,0.18);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 12px;
-  padding: 10px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-wrap: break-word;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.insightTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 10px;
+}
+
+.insightMeta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.insightCategory {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+.insightPriority {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .insightTitle {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .insightText {
-  font-size: 11px;
-  opacity: 0.85;
-  line-height: 1.25;
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.92;
 }
 
+.insightRecommendation {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.insight--success {
+  border-left: 4px solid #22c55e;
+}
+
+.insight--warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.insight--danger {
+  border-left: 4px solid #ef4444;
+}
+
+.insight--opportunity {
+  border-left: 4px solid #3b82f6;
+}
+
+.insight--info {
+  border-left: 4px solid #94a3b8;
+}
 /* Buttons */
 .btn {
   padding: 8px 12px;
@@ -1343,4 +1406,12 @@ input[type="file"] {
   top: 0;
   background: #11161d;
   z-index: 2;
+}
+.chartSlot .chartCard {
+  min-height: 0;
+}
+
+.chartSlot .chartWrap {
+  min-height: 0;
+  overflow: hidden;
 }
