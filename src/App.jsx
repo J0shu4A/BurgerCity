@@ -1,7 +1,7 @@
 // src/App.jsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import "./App.css";
-import { useRef } from 'react';
+
 import LoginGate from "./components/LoginGate";
 
 import FileUpload from "./components/FileUpload";
@@ -49,6 +49,7 @@ import {
 export default function App() {
   const [factsRaw, setFactsRaw] = useState([]);
   const [error, setError] = useState("");
+  const [campaigns, setCampaigns] = useState([]);
 
   const stores = useMemo(() => uniqueStores(factsRaw), [factsRaw]);
   const dates = useMemo(() => uniqueDates(factsRaw), [factsRaw]);
@@ -67,6 +68,20 @@ export default function App() {
 
   // Raw Panel
   const [showRawPanel, setShowRawPanel] = useState(false);
+  useEffect(() => {
+    async function fetchCampaigns() {
+      try {
+        const res = await fetch("http://seiz.ing/campaigns");
+        if (res.ok) {
+          const json = await res.json();
+          setCampaigns(json.data || []);
+        }
+      } catch (err) {
+        console.error("Fehler beim Laden der Kampagnen:", err);
+      }
+    }
+    fetchCampaigns();
+  }, []);
 
   function onFactsLoaded(facts) {
     setFactsRaw(facts);
@@ -734,6 +749,14 @@ export default function App() {
         >
           Peak Hours
         </button>
+
+        <button
+          className={`tabBtn ${salesTab === "campaigns" ? "active" : ""}`}
+          onClick={() => setSalesTab("campaigns")}
+          type="button"
+        >
+          Kampagnen
+        </button>
         <button
           className={`tabBtn ${salesTab === "insights" ? "active" : ""}`}
           onClick={() => setSalesTab("insights")}
@@ -747,6 +770,43 @@ export default function App() {
         {salesTab === "products" && (
           <div className="chartSlot">
             <TopProductsChart data={chartProducts} />
+          </div>
+        )}
+        {salesTab === "campaigns" && (
+          <div className="chartSlot" style={{ display: "flex", gap: "20px", flexWrap: "wrap", padding: "20px 0" }}>
+            {campaigns.length === 0 ? (
+              <div className="tinyHint">Lade Kampagnen oder keine verfügbar...</div>
+            ) : (
+              campaigns.map((c) => (
+                <div key={c.id} className="card" style={{ flex: "1 1 300px", padding: "20px" }}>
+                  <h3 style={{ marginTop: 0, marginBottom: "8px", fontSize: "1.2rem" }}>{c.title}</h3>
+                  <p className="tinyHint" style={{ marginBottom: "16px" }}>
+                    {c.start_date} bis {c.end_date}
+                  </p>
+                  
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span style={{ color: "#8b949e" }}>Aufrufe:</span>
+                    <strong style={{ color: "#c9d1d9" }}>{c.views.toLocaleString("de-DE")}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span style={{ color: "#8b949e" }}>Klicks:</span>
+                    <strong style={{ color: "#c9d1d9" }}>{c.clicks.toLocaleString("de-DE")}</strong>
+                  </div>
+                  
+                  <hr style={{ borderColor: "#30363d", margin: "16px 0" }} />
+                  
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <span style={{ color: "#8b949e", fontSize: "0.85rem", display: "block" }}>Click-Through-Rate</span>
+                      <strong style={{ color: "#58a6ff" }}>
+                        {((c.clicks / c.views) * 100).toFixed(1)}%
+                      </strong>
+                    </div>
+    
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
 
