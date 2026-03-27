@@ -14,6 +14,7 @@ import StoreRanking from "./components/StoreRanking";
 import BundlesChart from "./components/BundlesChart";
 import InsightsPanel from "./components/InsightsPanel";
 import ExportButtons from "./components/ExportButtons";
+import LocationCompetitionPanel from "./components/LocationCompetitionPanel";
 
 import BasketAnalysisChart from "./components/BasketAnalysisChart";
 import PerformanceChart from "./components/PerformanceChart";
@@ -46,10 +47,19 @@ import {
   marketingInsights,
 } from "./lib/metrics";
 
+import {
+  buildStoreLocationBase,
+  mergeLocationIntelWithStoreMetrics,
+  locationInsights as buildLocationInsights,
+} from "./lib/locationInsights";
+
 export default function App() {
   const [factsRaw, setFactsRaw] = useState([]);
   const [error, setError] = useState("");
   const [campaigns, setCampaigns] = useState([]);
+
+  const [locationIntelRows, setLocationIntelRows] = useState([]);
+  const [locationIntelLoading, setLocationIntelLoading] = useState(false);
 
   const stores = useMemo(() => uniqueStores(factsRaw), [factsRaw]);
   const dates = useMemo(() => uniqueDates(factsRaw), [factsRaw]);
@@ -68,6 +78,7 @@ export default function App() {
 
   // Raw Panel
   const [showRawPanel, setShowRawPanel] = useState(false);
+
   useEffect(() => {
     async function fetchCampaigns() {
       try {
@@ -94,13 +105,13 @@ export default function App() {
     setActiveChart("day");
     setError("");
   }
-  function onFactsAppended(newFacts) {
-    setFactsRaw(prevFacts => {
-      // Sicherheits-Check: Wir filtern Bestellungen heraus, die wir schon im Dashboard haben!
-      const existingIds = new Set(prevFacts.map(f => f.order_id));
-      const trulyNew = newFacts.filter(f => !existingIds.has(f.order_id));
 
-      if (trulyNew.length === 0) return prevFacts; // Nichts wirklich Neues dabei
+  function onFactsAppended(newFacts) {
+    setFactsRaw((prevFacts) => {
+      const existingIds = new Set(prevFacts.map((f) => f.order_id));
+      const trulyNew = newFacts.filter((f) => !existingIds.has(f.order_id));
+
+      if (trulyNew.length === 0) return prevFacts;
 
       const combined = [...prevFacts, ...trulyNew];
       const ds = uniqueDates(combined);
@@ -130,11 +141,10 @@ export default function App() {
     });
   }
 
-  // 3. NEU: Hilfsfunktion für die lokale Zeit und die neue Fetch-Logik
   function getLocalIsoString() {
     const now = new Date();
     const tzOffset = now.getTimezoneOffset() * 60000;
-    return new Date(now - tzOffset).toISOString().slice(0, 19); 
+    return new Date(now - tzOffset).toISOString().slice(0, 19);
   }
 
   async function loadLatestApiData() {
@@ -144,10 +154,11 @@ export default function App() {
 
       if (!lastFetchTimestamp.current) {
         console.log("Erster Klick: Lade komplette Historie...");
-        // Wir setzen das Enddatum einfach absurd weit in die Zukunft (Jahr 2099)
         url = `http://seiz.ing/orders?start_date=2024-01-01T00:00:00&end_date=2099-12-31T23:59:59`;
       } else {
-        console.log(`Zweiter Klick: Lade neue Daten ab dem letzten bekannten Timestamp: ${lastFetchTimestamp.current}`);
+        console.log(
+          `Zweiter Klick: Lade neue Daten ab dem letzten bekannten Timestamp: ${lastFetchTimestamp.current}`
+        );
         url = `http://seiz.ing/orders?start_date=${lastFetchTimestamp.current}&end_date=2099-12-31T23:59:59`;
       }
 
@@ -160,51 +171,40 @@ export default function App() {
       }
 
       const data = await res.json();
-      
+
       if (data && data.length > 0) {
         const normalized = normalizeApiFacts(data);
-        
+
         if (!lastFetchTimestamp.current) {
-          onFactsLoaded(normalized); 
+          onFactsLoaded(normalized);
         } else {
           onFactsAppended(normalized);
         }
-        
+
         console.log(`${data.length} Zeilen von der API empfangen.`);
 
-        // --- DER MAGISCHE FIX ---
-        // Wir suchen uns das allerneueste Datum aus den empfangenen Daten.
-        // So sind wir zu 100% synchron mit der Server-Datenbank, egal in welcher Zeitzone sie ist!
         let maxDateStr = lastFetchTimestamp.current || "2000-01-01T00:00:00";
         for (const row of data) {
-           if (row.datetime && row.datetime > maxDateStr) {
-              maxDateStr = row.datetime;
-           }
+          if (row.datetime && row.datetime > maxDateStr) {
+            maxDateStr = row.datetime;
+          }
         }
-        // Wir merken uns dieses Datum für den nächsten Klick!
         lastFetchTimestamp.current = maxDateStr;
-
       } else {
-        alert("Es gibt noch keine neuen Bestellungen. Versuch es in ein paar Sekunden nochmal!");
+        alert(
+          "Es gibt noch keine neuen Bestellungen. Versuch es in ein paar Sekunden nochmal!"
+        );
       }
-
     } catch (err) {
       console.error(err);
       setError("Fehler beim Laden der API-Daten.");
     }
   }
 
-  
-
   const facts = useMemo(
     () => filterFacts(factsRaw, { store, fromDate, toDate }),
     [factsRaw, store, fromDate, toDate]
   );
- 
-  
-
-  
- 
 
   const kpis = useMemo(() => computeKpis(facts), [facts]);
 
@@ -221,6 +221,70 @@ export default function App() {
   const basketSummary = useMemo(() => basketKpis(facts), [facts]);
   const chartPerformance = useMemo(() => performanceByStore(facts), [facts]);
 
+  // Standortbasis für API
+  const storeLocationBase = useMemo(() => buildStoreLocationBase(facts), [facts]);
+
+  const enrichedLocationRows = useMemo(() => {
+    return mergeLocationIntelWithStoreMetrics(
+      storeLocationBase,
+      locationIntelRows
+    );
+  }, [storeLocationBase, locationIntelRows]);
+
+  const geoInsightItems = useMemo(() => {
+    return buildLocationInsights(enrichedLocationRows);
+  }, [enrichedLocationRows]);
+
+  const combinedMarketingInsightItems = useMemo(() => {
+    return [...marketingInsightItems, ...geoInsightItems];
+  }, [marketingInsightItems, geoInsightItems]);
+
+  // Standortdaten laden
+  useEffect(() => {
+    async function loadLocationIntel() {
+      if (!storeLocationBase.length) {
+        setLocationIntelRows([]);
+        return;
+      }
+
+      try {
+        setLocationIntelLoading(true);
+
+        const res = await fetch("http://localhost:5174/api/location-intel", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            stores: storeLocationBase.map((s) => ({
+              store: s.store,
+              district: s.district,
+              postal_code: s.postal_code,
+            })),
+            radius: 800,
+          }),
+        });
+
+        const json = await res.json();
+
+        if (!res.ok || !json.ok) {
+          console.error(json?.message || "Location Intel fehlgeschlagen");
+          setLocationIntelRows([]);
+          return;
+        }
+
+        setLocationIntelRows(json.rows || []);
+      } catch (err) {
+        console.error(err);
+        setLocationIntelRows([]);
+      } finally {
+        setLocationIntelLoading(false);
+      }
+    }
+
+    loadLocationIntel();
+  }, [storeLocationBase]);
+
   // Year KPIs / Alerts
   const chartDayForYear = useMemo(() => {
     return (chartDayRaw || [])
@@ -235,26 +299,21 @@ export default function App() {
     () => computeYearKpis(chartDayForYear),
     [chartDayForYear]
   );
-  // 1. WICHTIG: totalProfit MUSS hier im Code bleiben, auch wenn wir unten ytdProfit anzeigen
+
   const totalProfit = useMemo(() => calculateTotalProfit(facts || []), [facts]);
 
-  // 2. Der kugelsichere YTD Profit
   const ytdProfit = useMemo(() => {
-    // Sicherheits-Check: Wenn keine Daten da sind, sofort abbrechen
     if (!facts || facts.length === 0 || !yearKpis?.ytdRevenue) return 0;
 
-    // Umsatz ganz simpel und sicher aufsummieren
     let totalRev = 0;
-    facts.forEach(r => {
+    facts.forEach((r) => {
       totalRev += Number(r.revenue || 0);
     });
 
-    // Division durch 0 strikt verhindern
-    const avgMargin = totalRev > 0 ? (totalProfit / totalRev) : 0.12; 
-    
+    const avgMargin = totalRev > 0 ? totalProfit / totalRev : 0.12;
+
     return yearKpis.ytdRevenue * avgMargin;
   }, [facts, totalProfit, yearKpis?.ytdRevenue]);
-  
 
   const alerts = useMemo(() => {
     return buildAlerts(chartDayForYear, {
@@ -403,15 +462,9 @@ export default function App() {
           </div>
 
           <div className="headerRight">
-            <button
-              className="btn"
-              type="button"
-              onClick={loadLatestApiData}
-            >
+            <button className="btn" type="button" onClick={loadLatestApiData}>
               Letzte API-Daten
             </button>
-
-            
 
             <button
               className="btn"
@@ -519,74 +572,204 @@ export default function App() {
   }
 
   function renderOverviewPanel() {
-  return (
-    <>
-      {renderCommonHeader(
-        "Eroglu Control",
-        "Performance Monitoring • Umsatzanalyse • Forecasting",
-        true
-      )}
+    return (
+      <>
+        {renderCommonHeader(
+          "Eroglu Control",
+          "Performance Monitoring • Umsatzanalyse • Forecasting",
+          true
+        )}
 
-      <KpiCards kpis={kpis} />
+        <KpiCards kpis={kpis} />
 
-      {factsRaw.length > 0 && (
-        <div className="card basketSummary">
-          <div className="basketStat">
-            <div className="label">YTD Umsatz</div>
-            <div className="value">
-              {new Intl.NumberFormat("de-DE", {
-                style: "currency",
-                currency: "EUR",
-              }).format(yearKpis?.ytdRevenue || 0)}
+        {factsRaw.length > 0 && (
+          <div className="card basketSummary">
+            <div className="basketStat">
+              <div className="label">YTD Umsatz</div>
+              <div className="value">
+                {new Intl.NumberFormat("de-DE", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(yearKpis?.ytdRevenue || 0)}
+              </div>
+            </div>
+
+            <div className="basketStat">
+              <div className="label">YTD Gewinn</div>
+              <div className="value" style={{ color: "#10b981" }}>
+                {new Intl.NumberFormat("de-DE", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(ytdProfit || 0)}
+              </div>
+            </div>
+
+            <div className="basketStat">
+              <div className="label">Umsatz Vorjahr</div>
+              <div className="value">
+                {new Intl.NumberFormat("de-DE", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(yearKpis?.lastYearRevenue || 0)}
+              </div>
+            </div>
+
+            <div className="basketStat">
+              <div className="label">YoY Wachstum</div>
+              <div className="value">
+                {yearKpis?.yoy == null
+                  ? "-"
+                  : `${(yearKpis.yoy * 100).toFixed(1)}%`}
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="basketStat">
-            <div className="label">YTD Gewinn</div>
-            <div className="value" style={{ color: "#10b981" }}>
-              {new Intl.NumberFormat("de-DE", {
-                style: "currency",
-                currency: "EUR",
-              }).format(ytdProfit || 0)}
+        {basketSummary?.orders !== undefined && (
+          <div
+            className="card"
+            style={{
+              display: "flex",
+              gap: 16,
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <div className="label">Orders</div>
+              <div className="value">{basketSummary.orders}</div>
+            </div>
+            <div>
+              <div className="label">AOV</div>
+              <div className="value">
+                {new Intl.NumberFormat("de-DE", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(basketSummary.aov || 0)}
+              </div>
+            </div>
+            <div>
+              <div className="label">Bundle-Quote</div>
+              <div className="value">
+                {Math.round((basketSummary.bundleRate || 0) * 100)}%
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="basketStat">
-            <div className="label">Umsatz Vorjahr</div>
-            <div className="value">
-              {new Intl.NumberFormat("de-DE", {
-                style: "currency",
-                currency: "EUR",
-              }).format(yearKpis?.lastYearRevenue || 0)}
-            </div>
-          </div>
+        <div className="mainLayout">
+          <AlertsSidebar alerts={alerts} />
 
-          <div className="basketStat">
-            <div className="label">YoY Wachstum</div>
-            <div className="value">
-              {yearKpis?.yoy == null
-                ? "-"
-                : `${(yearKpis.yoy * 100).toFixed(1)}%`}
+          <div className="mainContent">
+            <ChartTabs active={activeChart} onChange={setActiveChart} />
+
+            <div className="chartContainer">
+              {activeChart === "day" && (
+                <div className="chartSlot">
+                  <RevenueChart data={chartDayRaw} />
+                </div>
+              )}
+
+              {activeChart === "hour" && (
+                <div className="chartSlot">
+                  <HourRevenueChart data={chartHour} />
+                </div>
+              )}
+
+              {activeChart === "year" && (
+                <div className="chartSlot">
+                  <YearRevenueChart data={yearKpis?.yearlySeries || []} />
+                </div>
+              )}
+
+              {activeChart === "products" && (
+                <div className="chartSlot">
+                  <TopProductsChart data={chartProducts} />
+                </div>
+              )}
+
+              {activeChart === "stores" && (
+                <div className="chartSlot">
+                  <StoreRanking data={chartStores} />
+                </div>
+              )}
+
+              {activeChart === "bundles" && (
+                <div className="chartSlot">
+                  <BundlesChart data={chartBundles} />
+                </div>
+              )}
+
+              {activeChart === "forecast" && (
+                <div className="chartSlot">
+                  <ForecastChart facts={facts} />
+                </div>
+              )}
+
+              {activeChart === "forecastplus" && (
+                <div className="chartSlot">
+                  <ForecastPlus facts={facts} />
+                </div>
+              )}
+
+              {activeChart === "basket" && (
+                <div className="chartSlot">
+                  <BasketAnalysisChart data={chartBasket} />
+                </div>
+              )}
+
+              {activeChart === "performance" && (
+                <div className="chartSlot">
+                  <PerformanceChart data={chartPerformance} />
+                </div>
+              )}
+
+              {activeChart === "insights" && (
+                <div className="chartSlot">
+                  <InsightsPanel
+                    items={insightItems}
+                    title="Insights (automatische Empfehlungen zur Umsatzsteigerung)"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
-      )}
 
-      {basketSummary?.orders !== undefined && (
-        <div
-          className="card"
-          style={{
-            display: "flex",
-            gap: 16,
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <div className="label">Orders</div>
-            <div className="value">{basketSummary.orders}</div>
+        <footer className="footer">
+          <span>Eroglu Control • Data-driven Performance Steering</span>
+        </footer>
+
+        <NewLocationPlanner
+          open={plannerOpen}
+          onClose={() => setPlannerOpen(false)}
+          facts={facts}
+        />
+      </>
+    );
+  }
+
+  function renderSalesMarketingPanel() {
+    return (
+      <>
+        {renderCommonHeader(
+          "Sales & Marketing Panel",
+          "Produktfokus • Vertrieb • Kampagnenansätze • Upsell",
+          false
+        )}
+
+        <div className="card basketSummary">
+          <div className="basketStat">
+            <div className="label">Top Produkt</div>
+            <div className="value">{chartProducts[0]?.product || "—"}</div>
           </div>
-          <div>
+
+          <div className="basketStat">
+            <div className="label">Top Bundle</div>
+            <div className="value">{chartBundles[0]?.bundle || "—"}</div>
+          </div>
+
+          <div className="basketStat">
             <div className="label">AOV</div>
             <div className="value">
               {new Intl.NumberFormat("de-DE", {
@@ -595,248 +778,200 @@ export default function App() {
               }).format(basketSummary.aov || 0)}
             </div>
           </div>
-          <div>
-            <div className="label">Bundle-Quote</div>
-            <div className="value">
-              {Math.round((basketSummary.bundleRate || 0) * 100)}%
+        </div>
+
+        <div className="tabs">
+          <button
+            className={`tabBtn ${salesTab === "products" ? "active" : ""}`}
+            onClick={() => setSalesTab("products")}
+            type="button"
+          >
+            Produkte
+          </button>
+
+          <button
+            className={`tabBtn ${salesTab === "bundles" ? "active" : ""}`}
+            onClick={() => setSalesTab("bundles")}
+            type="button"
+          >
+            Bundles
+          </button>
+
+          <button
+            className={`tabBtn ${salesTab === "hour" ? "active" : ""}`}
+            onClick={() => setSalesTab("hour")}
+            type="button"
+          >
+            Peak Hours
+          </button>
+
+          <button
+            className={`tabBtn ${salesTab === "campaigns" ? "active" : ""}`}
+            onClick={() => setSalesTab("campaigns")}
+            type="button"
+          >
+            Kampagnen
+          </button>
+
+          <button
+            className={`tabBtn ${salesTab === "location" ? "active" : ""}`}
+            onClick={() => setSalesTab("location")}
+            type="button"
+          >
+            Standortanalyse
+          </button>
+
+          <button
+            className={`tabBtn ${salesTab === "insights" ? "active" : ""}`}
+            onClick={() => setSalesTab("insights")}
+            type="button"
+          >
+            Marketing Insights
+          </button>
+        </div>
+
+        <div className="chartContainer">
+          {salesTab === "products" && (
+            <div className="chartSlot">
+              <TopProductsChart data={chartProducts} />
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      <div className="mainLayout">
-        <AlertsSidebar alerts={alerts} />
+          {salesTab === "campaigns" && (
+            <div
+              className="chartSlot"
+              style={{
+                display: "flex",
+                gap: "20px",
+                flexWrap: "wrap",
+                padding: "20px 0",
+              }}
+            >
+              {campaigns.length === 0 ? (
+                <div className="tinyHint">
+                  Lade Kampagnen oder keine verfügbar...
+                </div>
+              ) : (
+                campaigns.map((c) => (
+                  <div
+                    key={c.id}
+                    className="card"
+                    style={{ flex: "1 1 300px", padding: "20px" }}
+                  >
+                    <h3
+                      style={{
+                        marginTop: 0,
+                        marginBottom: "8px",
+                        fontSize: "1.2rem",
+                      }}
+                    >
+                      {c.title}
+                    </h3>
 
-        <div className="mainContent">
-          <ChartTabs active={activeChart} onChange={setActiveChart} />
+                    <p className="tinyHint" style={{ marginBottom: "16px" }}>
+                      {c.start_date} bis {c.end_date}
+                    </p>
 
-          <div className="chartContainer">
-            {activeChart === "day" && (
-              <div className="chartSlot">
-                <RevenueChart data={chartDayRaw} />
-              </div>
-            )}
-
-            {activeChart === "hour" && (
-              <div className="chartSlot">
-                <HourRevenueChart data={chartHour} />
-              </div>
-            )}
-
-            {activeChart === "year" && (
-              <div className="chartSlot">
-                <YearRevenueChart data={yearKpis?.yearlySeries || []} />
-              </div>
-            )}
-
-            {activeChart === "products" && (
-              <div className="chartSlot">
-                <TopProductsChart data={chartProducts} />
-              </div>
-            )}
-
-            {activeChart === "stores" && (
-              <div className="chartSlot">
-                <StoreRanking data={chartStores} />
-              </div>
-            )}
-
-            {activeChart === "bundles" && (
-              <div className="chartSlot">
-                <BundlesChart data={chartBundles} />
-              </div>
-            )}
-
-            {activeChart === "forecast" && (
-              <div className="chartSlot">
-                <ForecastChart facts={facts} />
-              </div>
-            )}
-
-            {activeChart === "forecastplus" && (
-              <div className="chartSlot">
-                <ForecastPlus facts={facts} />
-              </div>
-            )}
-
-            {activeChart === "basket" && (
-              <div className="chartSlot">
-                <BasketAnalysisChart data={chartBasket} />
-              </div>
-            )}
-
-            {activeChart === "performance" && (
-              <div className="chartSlot">
-                <PerformanceChart data={chartPerformance} />
-              </div>
-            )}
-
-            {activeChart === "insights" && (
-              <div className="chartSlot">
-                <InsightsPanel
-                  items={insightItems}
-                  title="Insights (automatische Empfehlungen zur Umsatzsteigerung)"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <footer className="footer">
-        <span>Eroglu Control • Data-driven Performance Steering</span>
-      </footer>
-
-      <NewLocationPlanner
-        open={plannerOpen}
-        onClose={() => setPlannerOpen(false)}
-        facts={facts}
-      />
-    </>
-  );
-}
-
-  function renderSalesMarketingPanel() {
-  return (
-    <>
-      {renderCommonHeader(
-        "Sales & Marketing Panel",
-        "Produktfokus • Vertrieb • Kampagnenansätze • Upsell",
-        false
-      )}
-
-      <div className="card basketSummary">
-        <div className="basketStat">
-          <div className="label">Top Produkt</div>
-          <div className="value">{chartProducts[0]?.product || "—"}</div>
-        </div>
-
-        <div className="basketStat">
-          <div className="label">Top Bundle</div>
-          <div className="value">{chartBundles[0]?.bundle || "—"}</div>
-        </div>
-
-        <div className="basketStat">
-          <div className="label">AOV</div>
-          <div className="value">
-            {new Intl.NumberFormat("de-DE", {
-              style: "currency",
-              currency: "EUR",
-            }).format(basketSummary.aov || 0)}
-          </div>
-        </div>
-      </div>
-
-      <div className="tabs">
-        <button
-          className={`tabBtn ${salesTab === "products" ? "active" : ""}`}
-          onClick={() => setSalesTab("products")}
-          type="button"
-        >
-          Produkte
-        </button>
-        <button
-          className={`tabBtn ${salesTab === "bundles" ? "active" : ""}`}
-          onClick={() => setSalesTab("bundles")}
-          type="button"
-        >
-          Bundles
-        </button>
-        <button
-          className={`tabBtn ${salesTab === "hour" ? "active" : ""}`}
-          onClick={() => setSalesTab("hour")}
-          type="button"
-        >
-          Peak Hours
-        </button>
-
-        <button
-          className={`tabBtn ${salesTab === "campaigns" ? "active" : ""}`}
-          onClick={() => setSalesTab("campaigns")}
-          type="button"
-        >
-          Kampagnen
-        </button>
-        <button
-          className={`tabBtn ${salesTab === "insights" ? "active" : ""}`}
-          onClick={() => setSalesTab("insights")}
-          type="button"
-        >
-          Marketing Insights
-        </button>
-      </div>
-
-      <div className="chartContainer">
-        {salesTab === "products" && (
-          <div className="chartSlot">
-            <TopProductsChart data={chartProducts} />
-          </div>
-        )}
-        {salesTab === "campaigns" && (
-          <div className="chartSlot" style={{ display: "flex", gap: "20px", flexWrap: "wrap", padding: "20px 0" }}>
-            {campaigns.length === 0 ? (
-              <div className="tinyHint">Lade Kampagnen oder keine verfügbar...</div>
-            ) : (
-              campaigns.map((c) => (
-                <div key={c.id} className="card" style={{ flex: "1 1 300px", padding: "20px" }}>
-                  <h3 style={{ marginTop: 0, marginBottom: "8px", fontSize: "1.2rem" }}>{c.title}</h3>
-                  <p className="tinyHint" style={{ marginBottom: "16px" }}>
-                    {c.start_date} bis {c.end_date}
-                  </p>
-                  
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                    <span style={{ color: "#8b949e" }}>Aufrufe:</span>
-                    <strong style={{ color: "#c9d1d9" }}>{c.views.toLocaleString("de-DE")}</strong>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                    <span style={{ color: "#8b949e" }}>Klicks:</span>
-                    <strong style={{ color: "#c9d1d9" }}>{c.clicks.toLocaleString("de-DE")}</strong>
-                  </div>
-                  
-                  <hr style={{ borderColor: "#30363d", margin: "16px 0" }} />
-                  
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <span style={{ color: "#8b949e", fontSize: "0.85rem", display: "block" }}>Click-Through-Rate</span>
-                      <strong style={{ color: "#58a6ff" }}>
-                        {((c.clicks / c.views) * 100).toFixed(1)}%
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <span style={{ color: "#8b949e" }}>Aufrufe:</span>
+                      <strong style={{ color: "#c9d1d9" }}>
+                        {c.views.toLocaleString("de-DE")}
                       </strong>
                     </div>
-    
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <span style={{ color: "#8b949e" }}>Klicks:</span>
+                      <strong style={{ color: "#c9d1d9" }}>
+                        {c.clicks.toLocaleString("de-DE")}
+                      </strong>
+                    </div>
+
+                    <hr
+                      style={{
+                        borderColor: "#30363d",
+                        margin: "16px 0",
+                      }}
+                    />
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <span
+                          style={{
+                            color: "#8b949e",
+                            fontSize: "0.85rem",
+                            display: "block",
+                          }}
+                        >
+                          Click-Through-Rate
+                        </span>
+                        <strong style={{ color: "#58a6ff" }}>
+                          {c.views > 0
+                            ? ((c.clicks / c.views) * 100).toFixed(1)
+                            : "0.0"}
+                          %
+                        </strong>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+                ))
+              )}
+            </div>
+          )}
 
-        {salesTab === "bundles" && (
-          <div className="chartSlot">
-            <BundlesChart data={chartBundles} />
-          </div>
-        )}
+          {salesTab === "bundles" && (
+            <div className="chartSlot">
+              <BundlesChart data={chartBundles} />
+            </div>
+          )}
 
-        {salesTab === "hour" && (
-          <div className="chartSlot">
-            <HourRevenueChart data={chartHour} />
-          </div>
-        )}
+          {salesTab === "hour" && (
+            <div className="chartSlot">
+              <HourRevenueChart data={chartHour} />
+            </div>
+          )}
 
-        {salesTab === "insights" && (
-          <div className="chartSlot">
-            <InsightsPanel
-              items={marketingInsightItems}
-              title="Marketing & Sales Insights"
-            />
-          </div>
-        )}
-      </div>
+          {salesTab === "location" && (
+            <div className="chartSlot">
+              <LocationCompetitionPanel
+                rows={enrichedLocationRows}
+                loading={locationIntelLoading}
+              />
+            </div>
+          )}
 
-      <footer className="footer">
-        <span>Sales & Marketing Panel • Campaign & Conversion Focus</span>
-      </footer>
-    </>
-  );
+          {salesTab === "insights" && (
+            <div className="chartSlot">
+              <InsightsPanel
+                items={combinedMarketingInsightItems}
+                title="Marketing & Sales Insights"
+              />
+            </div>
+          )}
+        </div>
+
+        <footer className="footer">
+          <span>Sales & Marketing Panel • Campaign & Conversion Focus</span>
+        </footer>
+      </>
+    );
   }
 
   return (
