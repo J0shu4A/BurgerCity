@@ -158,11 +158,26 @@ export function storeRanking(facts) {
     const s = f.store || "Unbekannt";
 
     if (!byStore.has(s)) {
-      byStore.set(s, { revenue: 0, orders: new Set() });
+      byStore.set(s, {
+        revenue: 0,
+        profit: 0,
+        orders: new Set(),
+      });
     }
 
     const d = byStore.get(s);
-    d.revenue += revenueOf(f);
+    const revenue = revenueOf(f);
+
+    d.revenue += revenue;
+
+    // 👉 Gewinnberechnung
+    const lineProfit =
+      f.profit != null
+        ? Number(f.profit)
+        : revenue * 0.12; // fallback Marge
+
+    d.profit += lineProfit;
+
     if (f.order_id) d.orders.add(f.order_id);
   }
 
@@ -174,6 +189,7 @@ export function storeRanking(facts) {
       return {
         store,
         revenue: Number(d.revenue.toFixed(2)),
+        profit: Number(d.profit.toFixed(2)), // 👈 NEU
         orderCount,
         aov: Number(aov.toFixed(2)),
       };
