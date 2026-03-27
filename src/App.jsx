@@ -1,7 +1,7 @@
 // src/App.jsx
 import { useMemo, useState } from "react";
 import "./App.css";
-
+import { useRef } from 'react';
 import LoginGate from "./components/LoginGate";
 
 import FileUpload from "./components/FileUpload";
@@ -52,6 +52,7 @@ export default function App() {
 
   const stores = useMemo(() => uniqueStores(factsRaw), [factsRaw]);
   const dates = useMemo(() => uniqueDates(factsRaw), [factsRaw]);
+  const lastFetchTimestamp = useRef(null);
 
   const [store, setStore] = useState("ALL");
   const [fromDate, setFromDate] = useState("");
@@ -78,6 +79,20 @@ export default function App() {
     setActiveChart("day");
     setError("");
   }
+  function onFactsAppended(newFacts) {
+    setFactsRaw(prevFacts => {
+      // Sicherheits-Check: Wir filtern Bestellungen heraus, die wir schon im Dashboard haben!
+      const existingIds = new Set(prevFacts.map(f => f.order_id));
+      const trulyNew = newFacts.filter(f => !existingIds.has(f.order_id));
+
+      if (trulyNew.length === 0) return prevFacts; // Nichts wirklich Neues dabei
+
+      const combined = [...prevFacts, ...trulyNew];
+      const ds = uniqueDates(combined);
+      setToDate(ds[ds.length - 1] || "");
+      return combined;
+    });
+  }
 
   function normalizeApiFacts(rows) {
     return (rows || []).map((r) => {
@@ -100,71 +115,71 @@ export default function App() {
     });
   }
 
-  async function loadLatestApiData() {
-  try {
-    setError("");
-
-    // Zeitraum definieren (z.B. die letzten 7 Tage oder festes Datum)
-    const startDate = "2023-01-01";
-    const endDate = "2026-03-27";
-
-    // URL mit Query-Parametern für deine Python-API
-    const url = `http://seiz.ing/orders?start_date=${startDate}&end_date=${endDate}`;
-
-    const res = await fetch(url, {
-      method: "GET",
-      // credentials: "include" nur lassen, wenn du wirklich Cookies/Auth nutzt
-    });
-
-    if (!res.ok) {
-      const errorJson = await res.json();
-      setError(errorJson?.detail || "API-Daten konnten nicht geladen werden.");
-      return;
-    }
-
-    const data = await res.json();
-    
-    // Da deine API direkt eine Liste [{}, {}] zurückgibt:
-    const normalized = normalizeApiFacts(data);
-    onFactsLoaded(normalized);
-
-  } catch (err) {
-    console.error(err);
-    setError("Fehler beim Laden der letzten API-Daten.");
+  // 3. NEU: Hilfsfunktion für die lokale Zeit und die neue Fetch-Logik
+  function getLocalIsoString() {
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    return new Date(now - tzOffset).toISOString().slice(0, 19); 
   }
-}
 
-  async function generateApiData() {
+  async function loadLatestApiData() {
     try {
       setError("");
+      let url = "";
 
-      const res = await fetch("http://localhost:5174/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          startDate: "2025-09-01",
-          endDate: "2026-02-28",
-        }),
-      });
+      if (!lastFetchTimestamp.current) {
+        console.log("Erster Klick: Lade komplette Historie...");
+        // Wir setzen das Enddatum einfach absurd weit in die Zukunft (Jahr 2099)
+        url = `http://seiz.ing/orders?start_date=2024-01-01T00:00:00&end_date=2099-12-31T23:59:59`;
+      } else {
+        console.log(`Zweiter Klick: Lade neue Daten ab dem letzten bekannten Timestamp: ${lastFetchTimestamp.current}`);
+        url = `http://seiz.ing/orders?start_date=${lastFetchTimestamp.current}&end_date=2099-12-31T23:59:59`;
+      }
 
-      const json = await res.json();
+      const res = await fetch(url, { method: "GET" });
 
-      if (!res.ok || !json.ok) {
-        setError(
-          json?.message || "Neue API-Daten konnten nicht generiert werden."
-        );
+      if (!res.ok) {
+        const errorJson = await res.json();
+        setError(errorJson?.detail || "API-Daten konnten nicht geladen werden.");
         return;
       }
 
-      const normalized = normalizeApiFacts(json.data);
-      onFactsLoaded(normalized);
+      const data = await res.json();
+      
+      if (data && data.length > 0) {
+        const normalized = normalizeApiFacts(data);
+        
+        if (!lastFetchTimestamp.current) {
+          onFactsLoaded(normalized); 
+        } else {
+          onFactsAppended(normalized);
+        }
+        
+        console.log(`${data.length} Zeilen von der API empfangen.`);
+
+        // --- DER MAGISCHE FIX ---
+        // Wir suchen uns das allerneueste Datum aus den empfangenen Daten.
+        // So sind wir zu 100% synchron mit der Server-Datenbank, egal in welcher Zeitzone sie ist!
+        let maxDateStr = lastFetchTimestamp.current || "2000-01-01T00:00:00";
+        for (const row of data) {
+           if (row.datetime && row.datetime > maxDateStr) {
+              maxDateStr = row.datetime;
+           }
+        }
+        // Wir merken uns dieses Datum für den nächsten Klick!
+        lastFetchTimestamp.current = maxDateStr;
+
+      } else {
+        alert("Es gibt noch keine neuen Bestellungen. Versuch es in ein paar Sekunden nochmal!");
+      }
+
     } catch (err) {
-      setError("Fehler beim Generieren der API-Daten.");
+      console.error(err);
+      setError("Fehler beim Laden der API-Daten.");
     }
   }
+
+  
 
   const facts = useMemo(
     () => filterFacts(factsRaw, { store, fromDate, toDate }),
@@ -381,13 +396,7 @@ export default function App() {
               Letzte API-Daten
             </button>
 
-            <button
-              className="btn"
-              type="button"
-              onClick={generateApiData}
-            >
-              Neue API-Daten
-            </button>
+            
 
             <button
               className="btn"
