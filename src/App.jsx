@@ -225,11 +225,34 @@ export default function App() {
   const storeLocationBase = useMemo(() => buildStoreLocationBase(facts), [facts]);
 
   const enrichedLocationRows = useMemo(() => {
-    return mergeLocationIntelWithStoreMetrics(
-      storeLocationBase,
-      locationIntelRows
-    );
-  }, [storeLocationBase, locationIntelRows]);
+  const merged = mergeLocationIntelWithStoreMetrics(
+    storeLocationBase,
+    locationIntelRows
+  );
+
+  return merged.map((row) => {
+    const intel =
+      locationIntelRows.find((x) => x.store === row.store) || {};
+
+    return {
+      ...row,
+      population: intel.population ?? row.population ?? 0,
+      populationIndex: intel.populationIndex ?? row.populationIndex ?? 0,
+      priceIncreaseRecommendation:
+        intel.priceIncreaseRecommendation ??
+        row.priceIncreaseRecommendation ??
+        0,
+      fastFoodCompetitors:
+        intel.fastFoodCompetitors ?? row.fastFoodCompetitors ?? 0,
+      restaurantCompetitors:
+        intel.restaurantCompetitors ?? row.restaurantCompetitors ?? 0,
+      totalCompetitors:
+        intel.totalCompetitors ?? row.totalCompetitors ?? 0,
+      revenue: row.revenue ?? intel.revenue ?? 0,
+      orderCount: row.orderCount ?? intel.orderCount ?? 0,
+    };
+  });
+}, [storeLocationBase, locationIntelRows]);
 
   const geoInsightItems = useMemo(() => {
     return buildLocationInsights(enrichedLocationRows);

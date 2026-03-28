@@ -7,6 +7,12 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const path = require("path");
 
+// NEU: Standortanalyse-Route
+const locationIntelRouter = require("./locationIntel");
+
+// Falls diese beiden in deinem Projekt schon woanders definiert/importiert werden,
+// lass die bestehenden Imports bestehen.
+// Wenn nicht, musst du sie wieder ergänzen.
 
 const app = express();
 
@@ -33,7 +39,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 /* ------------------------------------------------ */
-/* SIMPLE IN-MEMORY USER (für Start garantiert OK) */
+/* SIMPLE IN-MEMORY USER (für Start garantiert OK)  */
 /* ------------------------------------------------ */
 
 const users = [
@@ -95,6 +101,11 @@ function toCSV(rows) {
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
+
+/* ---------------- NEU: LOCATION API ---------------- */
+
+// Damit /api/location-intel funktioniert
+app.use("/api", locationIntelRouter);
 
 /* ---------------- AUTH ROUTES ---------------- */
 
@@ -209,10 +220,12 @@ app.get("/api/download-csv", requireAuth, (req, res) => {
 
 app.listen(PORT, () => {
   console.log("===================================");
-  console.log("🚀 AUTH + DATA SERVER RUNNING");
+  console.log("🚀 AUTH + DATA + LOCATION SERVER");
   console.log("👉 http://localhost:" + PORT);
   console.log("Login:");
   console.log("User: admin");
   console.log("Pass: eroglu2026");
+  console.log("Location API:");
+  console.log("POST /api/location-intel");
   console.log("===================================");
 });

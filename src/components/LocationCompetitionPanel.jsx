@@ -5,6 +5,10 @@ function fmtEUR(x) {
   }).format(Number(x) || 0);
 }
 
+function fmtPercent(x) {
+  return `+${Number(x) || 0}%`;
+}
+
 export default function LocationCompetitionPanel({ rows = [], loading = false }) {
   return (
     <div className="chartWrap">
@@ -14,9 +18,7 @@ export default function LocationCompetitionPanel({ rows = [], loading = false })
         {loading ? (
           <div className="tinyHint">Standortdaten werden geladen ...</div>
         ) : !rows.length ? (
-          <div className="tinyHint">
-            Keine Standortdaten verfügbar.
-          </div>
+          <div className="tinyHint">Keine Standortdaten verfügbar.</div>
         ) : (
           <>
             <div
@@ -28,13 +30,13 @@ export default function LocationCompetitionPanel({ rows = [], loading = false })
                   <tr>
                     <th>Filiale</th>
                     <th>Bezirk</th>
-                    <th>PLZ</th>
+                    <th>Einwohner</th>
+                    <th>Preisanhebung Empfehlung</th>
                     <th>Fast Food</th>
                     <th>Restaurants</th>
                     <th>Gesamt</th>
                     <th>Umsatz</th>
                     <th>Bestellungen</th>
-                    <th>AOV</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -42,13 +44,17 @@ export default function LocationCompetitionPanel({ rows = [], loading = false })
                     <tr key={r.store}>
                       <td>{r.store}</td>
                       <td>{r.district || "—"}</td>
-                      <td>{r.postal_code || "—"}</td>
+                      <td>
+                        {new Intl.NumberFormat("de-DE").format(
+                          Number(r.population) || 0
+                        )}
+                      </td>
+                      <td>{fmtPercent(r.priceIncreaseRecommendation)}</td>
                       <td>{r.fastFoodCompetitors}</td>
                       <td>{r.restaurantCompetitors}</td>
                       <td>{r.totalCompetitors}</td>
                       <td>{fmtEUR(r.revenue)}</td>
                       <td>{r.orderCount}</td>
-                      <td>{fmtEUR(r.aov)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -56,8 +62,7 @@ export default function LocationCompetitionPanel({ rows = [], loading = false })
             </div>
 
             <div className="tinyHint" style={{ marginTop: 12 }}>
-              Grundlage: OSM-POIs im Radius um die Filiale. Gezählt werden
-              `amenity=fast_food` und `amenity=restaurant`.
+              Empfehlung basiert auf Einwohnerpotenzial und Wettbewerbsdichte im Umkreis.
             </div>
           </>
         )}
