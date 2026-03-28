@@ -123,91 +123,24 @@ function dedupeNearbyByNameAndDistance(rows) {
   });
 }
 
-function loadRestaurantsCsv() {
-  const filePath = path.join(__dirname, "data", "restaurants_berlin.csv");
-
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`CSV nicht gefunden: ${filePath}`);
+async function fetchRestaurantsFromAPI() {
+  const response = await fetch("http://seiz.ing/competitors");
+  if (!response.ok) {
+    throw new Error(`API Fehler: Konkurrenten konnten nicht geladen werden.`);
   }
-
-  const raw = fs.readFileSync(filePath, "latin1");
-
-  const rows = parse(raw, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true,
-    relax_column_count: true,
-    relax_quotes: true,
-    skip_records_with_error: true,
-    bom: true,
-    on_skip: (err, record, info) => {
-      console.warn("Fehlerhafte CSV-Zeile übersprungen:", {
-        line: info?.lines,
-        message: err.message,
-        record,
-      });
-    },
-  });
-
-  let parsedRows = rows
-    .map((r) => ({
-      type: normalizeText(r["@type"] || r["type"] || ""),
-      name: String(r["name"] || "").trim(),
-      amenity: normalizeText(r["amenity"] || ""),
-      postal_code: String(r["addr:postcode"] || "").trim(),
-      suburb: String(r["addr:suburb"] || "").trim(),
-      lat: toNum(r["@lat"] ?? r["lat"]),
-      lon: toNum(r["@lon"] ?? r["lon"]),
-    }))
-    .filter((r) => r.lat != null && r.lon != null)
-    .filter((r) => ["fast food", "restaurant"].includes(r.amenity))
-    .filter(
-      (r) =>
-        r.lat >= 52.33 &&
-        r.lat <= 52.68 &&
-        r.lon >= 13.05 &&
-        r.lon <= 13.80
-    );
-
+  let parsedRows = await response.json();
+  
+  // Die alte Deduplizierung behalten wir bei, damit alles funktioniert wie vorher
   parsedRows = dedupePlaces(parsedRows);
-
   return parsedRows;
 }
 
-function loadPopulationCsv() {
-  const filePath = path.join(
-    __dirname,
-    "data",
-    "berlin_population_by_district.csv"
-  );
-
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Population CSV nicht gefunden: ${filePath}`);
+async function fetchPopulationFromAPI() {
+  const response = await fetch("http://seiz.ing/population");
+  if (!response.ok) {
+    throw new Error(`API Fehler: Bevölkerungsdaten konnten nicht geladen werden.`);
   }
-
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const firstLine = raw.split(/\r?\n/)[0] || "";
-  const delimiter = firstLine.includes(";") ? ";" : ",";
-
-  const rows = parse(raw, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true,
-    bom: true,
-    delimiter,
-  });
-
-  const parsed = rows.map((r) => ({
-    district: String(r.district || r.bezirk || "").trim(),
-    district_key: String(r.district_key || "").trim(),
-    population: Number(r.population) || 0,
-    population_index: Number(r.population_index) || 0,
-  }));
-
-  console.log("Population CSV geladen:", parsed.length, "Einträge");
-  console.log("Population CSV Preview:", parsed.slice(0, 5));
-
-  return parsed;
+  return await response.json();
 }
 
 function getPriceIncreaseRecommendation(
@@ -228,9 +161,9 @@ function getPriceIncreaseRecommendation(
   return 0;
 }
 
-router.get("/location-intel-test", (req, res) => {
+router.get("/location-intel-test", async (req, res) => {
   try {
-    const restaurants = loadRestaurantsCsv();
+    const restaurants = await fetchRestaurantsFromAPI();
 
     const amenityCounts = {};
     for (const r of restaurants) {
@@ -287,9 +220,9 @@ router.get("/location-intel-test", (req, res) => {
   }
 });
 
-router.get("/population-test", (req, res) => {
+router.get("/population-test", async (req, res) => {
   try {
-    const populationRows = loadPopulationCsv();
+    const populationRows = await fetchPopulationFromAPI();
 
     const sampleDistricts = [
       "Spandau",
@@ -601,8 +534,8 @@ router.post("/location-intel", async (req, res) => {
     const radiusKm = Number.isFinite(rawRadius) ? rawRadius / 1000 : 0.8;
 
     const stores = Array.isArray(req.body?.stores) ? req.body.stores : [];
-    const restaurants = loadRestaurantsCsv();
-    const populationRows = loadPopulationCsv();
+    const restaurants = await fetchRestaurantsFromAPI();
+    const populationRows = await fetchPopulationFromAPI();
 
     const results = stores.map((store) => {
       const hasRealCoords =
