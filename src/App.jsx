@@ -15,6 +15,7 @@ import BundlesChart from "./components/BundlesChart";
 import InsightsPanel from "./components/InsightsPanel";
 import ExportButtons from "./components/ExportButtons";
 import LocationCompetitionPanel from "./components/LocationCompetitionPanel";
+import CustomerSegmentationPanel from "./components/CustomerSegmentationPanel";
 
 import BasketAnalysisChart from "./components/BasketAnalysisChart";
 import PerformanceChart from "./components/PerformanceChart";
@@ -52,6 +53,11 @@ import {
   mergeLocationIntelWithStoreMetrics,
   locationInsights as buildLocationInsights,
 } from "./lib/locationInsights";
+
+import {
+  aggregateCustomers,
+  buildSegmentation,
+} from "./lib/customerSegmentation";
 
 export default function App() {
   const [factsRaw, setFactsRaw] = useState([]);
@@ -221,38 +227,44 @@ export default function App() {
   const basketSummary = useMemo(() => basketKpis(facts), [facts]);
   const chartPerformance = useMemo(() => performanceByStore(facts), [facts]);
 
+  // Customer Segmentation
+  const customerSegmentation = useMemo(() => {
+    const customers = aggregateCustomers(facts || [], facts || []);
+    return buildSegmentation(customers);
+  }, [facts]);
+
   // Standortbasis für API
   const storeLocationBase = useMemo(() => buildStoreLocationBase(facts), [facts]);
 
   const enrichedLocationRows = useMemo(() => {
-  const merged = mergeLocationIntelWithStoreMetrics(
-    storeLocationBase,
-    locationIntelRows
-  );
+    const merged = mergeLocationIntelWithStoreMetrics(
+      storeLocationBase,
+      locationIntelRows
+    );
 
-  return merged.map((row) => {
-    const intel =
-      locationIntelRows.find((x) => x.store === row.store) || {};
+    return merged.map((row) => {
+      const intel =
+        locationIntelRows.find((x) => x.store === row.store) || {};
 
-    return {
-      ...row,
-      population: intel.population ?? row.population ?? 0,
-      populationIndex: intel.populationIndex ?? row.populationIndex ?? 0,
-      priceIncreaseRecommendation:
-        intel.priceIncreaseRecommendation ??
-        row.priceIncreaseRecommendation ??
-        0,
-      fastFoodCompetitors:
-        intel.fastFoodCompetitors ?? row.fastFoodCompetitors ?? 0,
-      restaurantCompetitors:
-        intel.restaurantCompetitors ?? row.restaurantCompetitors ?? 0,
-      totalCompetitors:
-        intel.totalCompetitors ?? row.totalCompetitors ?? 0,
-      revenue: row.revenue ?? intel.revenue ?? 0,
-      orderCount: row.orderCount ?? intel.orderCount ?? 0,
-    };
-  });
-}, [storeLocationBase, locationIntelRows]);
+      return {
+        ...row,
+        population: intel.population ?? row.population ?? 0,
+        populationIndex: intel.populationIndex ?? row.populationIndex ?? 0,
+        priceIncreaseRecommendation:
+          intel.priceIncreaseRecommendation ??
+          row.priceIncreaseRecommendation ??
+          0,
+        fastFoodCompetitors:
+          intel.fastFoodCompetitors ?? row.fastFoodCompetitors ?? 0,
+        restaurantCompetitors:
+          intel.restaurantCompetitors ?? row.restaurantCompetitors ?? 0,
+        totalCompetitors:
+          intel.totalCompetitors ?? row.totalCompetitors ?? 0,
+        revenue: row.revenue ?? intel.revenue ?? 0,
+        orderCount: row.orderCount ?? intel.orderCount ?? 0,
+      };
+    });
+  }, [storeLocationBase, locationIntelRows]);
 
   const geoInsightItems = useMemo(() => {
     return buildLocationInsights(enrichedLocationRows);
@@ -837,6 +849,14 @@ export default function App() {
           </button>
 
           <button
+            className={`tabBtn ${salesTab === "customers" ? "active" : ""}`}
+            onClick={() => setSalesTab("customers")}
+            type="button"
+          >
+            Kundensegmente
+          </button>
+
+          <button
             className={`tabBtn ${salesTab === "location" ? "active" : ""}`}
             onClick={() => setSalesTab("location")}
             type="button"
@@ -971,6 +991,20 @@ export default function App() {
             </div>
           )}
 
+          {salesTab === "customers" && (
+  <div
+    className="chartSlot"
+    style={{
+      height: "auto",
+      minHeight: 0,
+      overflow: "visible",
+      paddingBottom: "56px",
+      width: "100%",
+    }}
+  >
+    <CustomerSegmentationPanel segmentation={customerSegmentation} />
+  </div>
+)}
           {salesTab === "location" && (
             <div className="chartSlot">
               <LocationCompetitionPanel
