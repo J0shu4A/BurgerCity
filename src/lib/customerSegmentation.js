@@ -29,12 +29,12 @@ export function getCustomerCluster(customer) {
   const items = toNumber(customer.avg_items_per_order);
 
   // Kleine durchschnittliche Bestellungen
-  if (aov < 18 && items <= 2) {
+  if (aov < 18 && items <= 4) {
     return "Singles";
   }
 
   // Mittlere durchschnittliche Bestellungen
-  if (aov >= 18 && aov < 45 && items <= 5) {
+  if (aov >= 18 && aov < 45 && items <= 10) {
     return "Families";
   }
 
