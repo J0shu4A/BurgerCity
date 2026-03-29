@@ -237,34 +237,34 @@ export default function App() {
   const storeLocationBase = useMemo(() => buildStoreLocationBase(facts), [facts]);
 
   const enrichedLocationRows = useMemo(() => {
-    const merged = mergeLocationIntelWithStoreMetrics(
-      storeLocationBase,
-      locationIntelRows
-    );
+  const merged = mergeLocationIntelWithStoreMetrics(
+    storeLocationBase,
+    locationIntelRows
+  );
 
-    return merged.map((row) => {
-      const intel =
-        locationIntelRows.find((x) => x.store === row.store) || {};
+  return merged.map((row) => {
+    const intel =
+      locationIntelRows.find((x) => x.store === row.store) || {};
 
-      return {
-        ...row,
-        population: intel.population ?? row.population ?? 0,
-        populationIndex: intel.populationIndex ?? row.populationIndex ?? 0,
-        priceIncreaseRecommendation:
-          intel.priceIncreaseRecommendation ??
-          row.priceIncreaseRecommendation ??
-          0,
-        fastFoodCompetitors:
-          intel.fastFoodCompetitors ?? row.fastFoodCompetitors ?? 0,
-        restaurantCompetitors:
-          intel.restaurantCompetitors ?? row.restaurantCompetitors ?? 0,
-        totalCompetitors:
-          intel.totalCompetitors ?? row.totalCompetitors ?? 0,
-        revenue: row.revenue ?? intel.revenue ?? 0,
-        orderCount: row.orderCount ?? intel.orderCount ?? 0,
-      };
-    });
-  }, [storeLocationBase, locationIntelRows]);
+    return {
+      ...row,
+      population: intel.population ?? row.population ?? 0,
+      populationIndex: intel.populationIndex ?? row.populationIndex ?? 0,
+      priceIncreaseRecommendation:
+        intel.priceIncreaseRecommendation ??
+        row.priceIncreaseRecommendation ??
+        0,
+      fastFoodCompetitors:
+        intel.fastFoodCompetitors ?? row.fastFoodCompetitors ?? 0,
+      restaurantCompetitors:
+        intel.restaurantCompetitors ?? row.restaurantCompetitors ?? 0,
+      totalCompetitors:
+        intel.totalCompetitors ?? row.totalCompetitors ?? 0,
+      revenue: row.revenue ?? intel.revenue ?? 0,
+      orderCount: row.orderCount ?? intel.orderCount ?? 0,
+    };
+  });
+}, [storeLocationBase, locationIntelRows]);
 
   const geoInsightItems = useMemo(() => {
     return buildLocationInsights(enrichedLocationRows);
@@ -972,7 +972,66 @@ export default function App() {
                           %
                         </strong>
                       </div>
+
+                      {/* --- NEU: Wachstum in Prozent --- */}
+                      <div style={{ textAlign: "right" }}>
+                        <span
+                          style={{
+                            color: "#8b949e",
+                            fontSize: "0.85rem",
+                            display: "block",
+                          }}
+                        >
+                          Umsatz vs. Vorjahr
+                        </span>
+                        <strong
+                          style={{
+                            color: c.growth_percent >= 0 ? "#3fb950" : "#f85149",
+                            fontSize: "1.1rem",
+                          }}
+                        >
+                          {c.growth_percent > 0 ? "+" : ""}
+                          {c.growth_percent?.toFixed(1) || "0.0"}%
+                        </strong>
+                      </div>
                     </div>
+
+                    {/* --- NEU: Die detaillierten Euro-Werte --- */}
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        paddingTop: "12px",
+                        borderTop: "1px dashed #30363d",
+                        fontSize: "0.85rem",
+                        color: "#8b949e",
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <span style={{ display: "block", marginBottom: "4px" }}>
+                          Umsatz im Kampagnenzeitraum:
+                        </span>
+                        <strong style={{ color: "#c9d1d9", fontSize: "0.95rem" }}>
+                          {c.revenue_campaign?.toLocaleString("de-DE", {
+                            style: "currency",
+                            currency: "EUR",
+                          }) || "0,00 €"}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ display: "block", marginBottom: "4px" }}>
+                          Gleicher Zeitraum (Vorjahr):
+                        </span>
+                        <span>
+                          {c.revenue_previous?.toLocaleString("de-DE", {
+                            style: "currency",
+                            currency: "EUR",
+                          }) || "0,00 €"}
+                        </span>
+                      </div>
+                    </div>
+                    
                   </div>
                 ))
               )}

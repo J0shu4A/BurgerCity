@@ -49,7 +49,8 @@ export default function RevenueChart({ data = [], fullscreen = false }) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={safeData}
-              margin={{ top: 8, right: 12, left: 0, bottom: 8 }}
+              // left: 15 gibt dem Chart links ein wenig mehr Luft zum Atmen
+              margin={{ top: 8, right: 12, left: 15, bottom: 8 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
 
@@ -63,12 +64,15 @@ export default function RevenueChart({ data = [], fullscreen = false }) {
 
               <YAxis
                 tickFormatter={(v) => `${Math.round(Number(v) || 0)}`}
-                width={fullscreen ? 60 : 40}
+                // Die Breite für die Zahlen wurde von 40/60 auf 65/80 erhöht!
+                width={fullscreen ? 80 : 65}
+                tick={{ fontSize: 12, fill: "#8b949e" }}
               />
 
               <Tooltip
                 labelFormatter={(label) => `Datum: ${String(label ?? "")}`}
                 formatter={(v) => fmtEUR(v)}
+                contentStyle={{ backgroundColor: "#161b22", borderColor: "#30363d", color: "#c9d1d9" }}
               />
 
               <Line
@@ -76,6 +80,8 @@ export default function RevenueChart({ data = [], fullscreen = false }) {
                 dataKey="revenue"
                 dot={false}
                 isAnimationActive={false}
+                stroke="#58a6ff" // Macht die Linie passend zum Dark-Mode schön blau
+                strokeWidth={2}
               />
 
               {safeData.length > 2 && (
@@ -84,6 +90,8 @@ export default function RevenueChart({ data = [], fullscreen = false }) {
                   height={28}
                   travellerWidth={10}
                   tickFormatter={safeDateLabel}
+                  stroke="#30363d"
+                  fill="#0d1117"
                 />
               )}
             </LineChart>
