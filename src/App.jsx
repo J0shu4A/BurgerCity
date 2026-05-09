@@ -59,6 +59,8 @@ import {
   buildSegmentation,
 } from "./lib/customerSegmentation";
 
+import { API_BASE, FASTAPI_BASE } from "./lib/config";
+
 export default function App() {
   const [factsRaw, setFactsRaw] = useState([]);
   const [error, setError] = useState("");
@@ -88,7 +90,7 @@ export default function App() {
   useEffect(() => {
     async function fetchCampaigns() {
       try {
-        const res = await fetch("http://seiz.ing/campaigns");
+        const res = await fetch(`${FASTAPI_BASE}/campaigns`);
         if (res.ok) {
           const json = await res.json();
           setCampaigns(json.data || []);
@@ -160,12 +162,12 @@ export default function App() {
 
       if (!lastFetchTimestamp.current) {
         console.log("Erster Klick: Lade komplette Historie...");
-        url = `http://seiz.ing/orders?start_date=2024-01-01T00:00:00&end_date=2099-12-31T23:59:59`;
+        url = `${FASTAPI_BASE}/orders?start_date=2024-01-01T00:00:00&end_date=2099-12-31T23:59:59`;
       } else {
         console.log(
           `Zweiter Klick: Lade neue Daten ab dem letzten bekannten Timestamp: ${lastFetchTimestamp.current}`
         );
-        url = `http://seiz.ing/orders?start_date=${lastFetchTimestamp.current}&end_date=2099-12-31T23:59:59`;
+        url = `${FASTAPI_BASE}/orders?start_date=${lastFetchTimestamp.current}&end_date=2099-12-31T23:59:59`;
       }
 
       const res = await fetch(url, { method: "GET" });
@@ -285,7 +287,7 @@ export default function App() {
       try {
         setLocationIntelLoading(true);
 
-        const res = await fetch("http://localhost:5174/api/location-intel", {
+        const res = await fetch(`${API_BASE}/api/location-intel`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

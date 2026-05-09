@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server:install": "npm --prefix server install",
+    "build:prod": "npm install && npm --prefix server install && npm run build",
+    "start": "node server/index.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

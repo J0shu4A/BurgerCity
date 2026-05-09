@@ -1,7 +1,7 @@
-const BASE = "http://localhost:5174";
+import { API_BASE } from "../lib/config";
 
 async function api(path, opts = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
     credentials: "include", // ✅ wichtig: Cookie mitsenden

@@ -16,19 +16,43 @@ const locationIntelRouter = require("./locationIntel");
 
 const app = express();
 
+// Wichtig hinter Cloudflare Tunnel: X-Forwarded-Proto vertrauen,
+// damit req.secure korrekt ist und Secure-Cookies funktionieren.
+app.set("trust proxy", true);
+
 app.use(express.json({ limit: "20mb" }));
 app.use(cookieParser());
 
+// In Dev (vite auf 5173) ist Frontend cross-origin → CORS mit credentials.
+// In Prod liefert dieser Server das gebaute Frontend selbst aus →
+// Requests sind same-origin und CORS wird gar nicht gebraucht. Trotzdem
+// ist eine Allowlist via Env nützlich (z.B. wenn man mal von einer anderen
+// Subdomain testen will).
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, cb) => {
+      // Same-origin / curl / server-to-server haben kein Origin → erlauben
+      if (!origin) return cb(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      // Nicht erlaubter Origin: keine CORS-Header senden, aber NICHT throwen.
+      // Der Browser blockt cross-origin dann selbst; same-origin Requests laufen
+      // trotzdem durch (bei same-origin wird CORS gar nicht erst geprüft).
+      return cb(null, false);
+    },
     credentials: true,
   })
 );
 
 const PORT = process.env.PORT || 5174;
+const HOST = process.env.HOST || "0.0.0.0";
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 const COOKIE_NAME = process.env.COOKIE_NAME || "eroglu_session";
+const IS_PROD = process.env.NODE_ENV === "production";
 
 const DATA_DIR = path.join(__dirname, "data");
 const LATEST_JSON = path.join(DATA_DIR, "latest.json");
@@ -58,7 +82,10 @@ function setSessionCookie(res, token) {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    // In Prod (hinter Cloudflare HTTPS) muss der Cookie Secure sein,
+    // sonst wird er vom Browser ignoriert. trust proxy + req.secure
+    // greifen hier auf X-Forwarded-Proto zurück.
+    secure: IS_PROD,
     maxAge: 1000 * 60 * 60 * 12,
   });
 }
@@ -216,12 +243,32 @@ app.get("/api/download-csv", requireAuth, (req, res) => {
   res.download(LATEST_CSV, "burgercity_latest.csv");
 });
 
+/* ---------------- STATIC FRONTEND (Production) ---------------- */
+// In Prod liefert dieser Server das vorher mit `vite build` erzeugte
+// Frontend aus ../dist. So genügt EIN Prozess (wie deine FastAPI auf 8000).
+// In Dev läuft Vite separat auf 5173 und ../dist existiert evtl. gar nicht.
+
+const DIST_DIR = path.join(__dirname, "..", "dist");
+
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+
+  // SPA-Fallback: alles, was nicht /api/* ist und keine Datei trifft,
+  // liefert die index.html (React-Router etc.).
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    res.sendFile(path.join(DIST_DIR, "index.html"));
+  });
+} else {
+  console.log("ℹ️  Kein dist/ gefunden – Frontend wird nicht ausgeliefert.");
+  console.log("    Für Production vorher 'npm run build' ausführen.");
+}
+
 /* ---------------- START SERVER ---------------- */
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log("===================================");
   console.log("🚀 AUTH + DATA + LOCATION SERVER");
-  console.log("👉 http://localhost:" + PORT);
+  console.log(`👉 http://${HOST}:${PORT}`);
   console.log("Login:");
   console.log("User: admin");
   console.log("Pass: eroglu2026");

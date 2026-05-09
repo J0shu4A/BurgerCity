@@ -1,0 +1,28 @@
+[Unit]
+Description=BurgerCity Dashboard (Express + React Build)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/Joshua/BurgerCity
+# Pfad zu node ggf. anpassen: `which node` auf dem Server prüfen.
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+
+# --- Environment ---
+Environment=NODE_ENV=production
+Environment=PORT=5174
+Environment=HOST=0.0.0.0
+# WICHTIG: in Prod ein eigenes Secret setzen!
+Environment=JWT_SECRET=BITTE_AENDERN_zufaelliger_string
+Environment=COOKIE_NAME=eroglu_session
+# Optional: zusätzliche Origins (kommagetrennt) wenn du mal cross-origin testest
+# Environment=CORS_ORIGINS=https://burgercity.seiz.ing
+
+StandardOutput=append:/var/log/burgercity.log
+StandardError=append:/var/log/burgercity.err.log
+
+[Install]
+WantedBy=multi-user.target
