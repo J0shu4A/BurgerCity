@@ -37,6 +37,7 @@ import {
   revenueByHour,
   topProductsByRevenue,
   uniqueStores,
+  uniqueProducts,
   uniqueDates,
   filterFacts,
   storeRanking,
@@ -70,10 +71,12 @@ export default function App() {
   const [locationIntelLoading, setLocationIntelLoading] = useState(false);
 
   const stores = useMemo(() => uniqueStores(factsRaw), [factsRaw]);
+  const products = useMemo(() => uniqueProducts(factsRaw), [factsRaw]);
   const dates = useMemo(() => uniqueDates(factsRaw), [factsRaw]);
   const lastFetchTimestamp = useRef(null);
 
   const [store, setStore] = useState("ALL");
+  const [product, setProduct] = useState("ALL");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -112,6 +115,7 @@ export default function App() {
 
     setActiveChart("day");
     setError("");
+    setProduct("ALL");
   }
 
   function onFactsAppended(newFacts) {
@@ -210,8 +214,8 @@ export default function App() {
   }
 
   const facts = useMemo(
-    () => filterFacts(factsRaw, { store, fromDate, toDate }),
-    [factsRaw, store, fromDate, toDate]
+    () => filterFacts(factsRaw, { store, product, fromDate, toDate }),
+    [factsRaw, store, product, fromDate, toDate]
   );
 
   const kpis = useMemo(() => computeKpis(facts), [facts]);
@@ -561,6 +565,22 @@ export default function App() {
                 {stores.map((s) => (
                   <option key={s} value={s}>
                     {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <div className="label">Produkt</div>
+              <select
+                value={product}
+                onChange={(e) => setProduct(e.target.value)}
+                disabled={!factsRaw.length}
+              >
+                <option value="ALL">Alle</option>
+                {products.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
                   </option>
                 ))}
               </select>

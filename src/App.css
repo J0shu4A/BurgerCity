@@ -1415,3 +1415,61 @@ input[type="file"] {
   min-height: 0;
   overflow: hidden;
 }
+
+/* =========================================
+   MOBILE: Layout darf scrollen, kein Fixed-Screen
+   Auf Smartphones (<= 768px) das gesamte Dashboard
+   als normale, scrollbare Seite rendern.
+========================================= */
+@media (max-width: 768px) {
+  html, body, #root {
+    overflow: auto;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100vh;
+    padding: 8px;
+  }
+
+  .capture {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .grid {
+    overflow: visible;
+    grid-template-columns: 1fr;
+  }
+
+  .kpis,
+  .chart,
+  .chartHead,
+  .chartBody,
+  .chartSlot,
+  .chartSlot .chartCard,
+  .chartSlot .chartWrap {
+    overflow: visible;
+    height: auto;
+    min-height: 0;
+  }
+
+  /* Recharts braucht eine konkrete Höhe sonst rendert nichts.
+     Auf Mobile geben wir jedem Chart-Bereich min. ~360px. */
+  .chartArea,
+  .chartSlot .chartArea {
+    height: 380px;
+    min-height: 380px;
+  }
+
+  /* Toolbar/Header dürfen sich frei stapeln */
+  .header {
+    flex-wrap: wrap;
+  }
+  .toolbarFilters {
+    flex-wrap: wrap;
+  }
+}

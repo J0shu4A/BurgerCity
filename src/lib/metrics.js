@@ -50,6 +50,12 @@ export function uniqueStores(facts) {
   );
 }
 
+export function uniqueProducts(facts) {
+  return Array.from(new Set(facts.map((f) => f.product).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b)
+  );
+}
+
 export function uniqueDates(facts) {
   const ds = facts
     .map((f) => (f.datetime ? formatYMD(f.datetime) : null))
@@ -58,11 +64,15 @@ export function uniqueDates(facts) {
   return Array.from(new Set(ds)).sort((a, b) => (a > b ? 1 : -1));
 }
 
-export function filterFacts(facts, { store, fromDate, toDate }) {
+export function filterFacts(facts, { store, product, fromDate, toDate }) {
   let out = facts || [];
 
   if (store && store !== "ALL") {
     out = out.filter((f) => f.store === store);
+  }
+
+  if (product && product !== "ALL") {
+    out = out.filter((f) => f.product === product);
   }
 
   if (fromDate) {
