@@ -1,3 +1,7 @@
+// Auth-Middleware für geschützte Routen. Prüft den Session-Cookie auf
+// einen gültigen JWT und hängt die Payload an req.user. Bei ungültiger
+// oder fehlender Session wird 401 zurückgegeben.
+
 const jwt = require("jsonwebtoken");
 
 function requireAuth(req, res, next) {

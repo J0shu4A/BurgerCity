@@ -1,4 +1,7 @@
-// src/App.jsx
+// Top-Level-Komponente. Hält den globalen State (Facts, Filter, aktiver Tab),
+// lädt Daten vom Datei-Upload oder von der FastAPI und verteilt sie an die
+// Charts und Panels. Authentifizierung läuft über LoginGate / AuthProvider.
+
 import { useMemo, useState, useEffect, useRef } from "react";
 import "./App.css";
 

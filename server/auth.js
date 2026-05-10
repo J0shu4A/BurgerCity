@@ -1,3 +1,8 @@
+// Hilfsfunktionen für die Nutzerverwaltung. Liest users.json (Username +
+// bcrypt-Hash) und prüft Passwörter. In index.js wird zusätzlich noch ein
+// fester In-Memory-Default-User (admin) eingerichtet, falls die Datei
+// nicht vorhanden ist.
+
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");

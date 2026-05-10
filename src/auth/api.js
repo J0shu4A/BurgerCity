@@ -1,3 +1,7 @@
+// Frontend-Wrapper für die Auth-Endpoints des Express-Servers.
+// credentials: include sorgt dafür, dass der Session-Cookie automatisch
+// mitgesendet wird.
+
 import { API_BASE } from "../lib/config";
 
 async function api(path, opts = {}) {

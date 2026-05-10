@@ -1,3 +1,6 @@
+// Vite-Entry-Point. Mountet App in #root und umschließt es mit dem
+// AuthProvider, damit Komponenten via Hook auf den Login-State zugreifen können.
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";

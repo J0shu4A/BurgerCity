@@ -1,3 +1,8 @@
+// Berechnungen für das Dashboard. Aggregiert die Roh-Facts (Bestellungen
+// inkl. Produkten und Preisen) zu KPIs, Zeitreihen, Rankings, Bundles und
+// Filterausgaben. Läuft komplett im Browser, damit Filterwechsel sofort
+// reagieren – die API liefert nur die Roh-Daten.
+
 import { formatYMD } from "./parse";
 
 /* =========================================

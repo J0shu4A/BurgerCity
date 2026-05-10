@@ -1,3 +1,8 @@
+// Standortanalyse-Endpoint. Nimmt eine Liste von Filialen entgegen,
+// liest aus einem lokalen OSM-Export die umliegenden Restaurants/Fast-Food-
+// Anbieter und liefert Wettbewerbsdichte + Bevölkerungsdaten pro Filiale.
+// Wird unter POST /api/location-intel registriert.
+
 const express = require("express");
 const fs = require("fs");
 const path = require("path");

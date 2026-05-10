@@ -1,3 +1,7 @@
+// React-Context für den eingeloggten Nutzer. Beim Mount wird /auth/me
+// gepingt, um eine bestehende Session zu erkennen. login()/logout() werden
+// per useAuth()-Hook in den Komponenten aufgerufen.
+
 import { createContext, useContext, useEffect, useState } from "react";
 import * as AuthAPI from "./api";
 

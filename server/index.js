@@ -1,3 +1,8 @@
+// BurgerCity Auth-Server.
+// Übernimmt Login (JWT-Cookie), liefert in Production das gebaute Frontend
+// aus dist/ aus und stellt Endpoints für die Standortanalyse bereit.
+// Daten-Aggregation läuft separat über die FastAPI (siehe Schwesterprojekt).
+
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -7,12 +12,7 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const path = require("path");
 
-// NEU: Standortanalyse-Route
 const locationIntelRouter = require("./locationIntel");
-
-// Falls diese beiden in deinem Projekt schon woanders definiert/importiert werden,
-// lass die bestehenden Imports bestehen.
-// Wenn nicht, musst du sie wieder ergänzen.
 
 const app = express();
 

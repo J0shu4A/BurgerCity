@@ -1,3 +1,7 @@
+// Erzeugt automatische Hinweise (Alerts) auf Basis der aktuellen Facts.
+// Erkennt z. B. starke Umsatzrückgänge gegenüber dem vorherigen Zeitraum
+// und liefert die Treffer in einer für die AlertsSidebar nutzbaren Struktur.
+
 import { sum } from "./analytics";
 
 function dateToTs(d) {

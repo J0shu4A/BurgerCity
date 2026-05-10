@@ -1,110 +1,145 @@
-# BurgerCity Deployment auf Linux (wie deine FastAPI)
+# Deployment
 
-Genauso wie `Server.py` läuft BurgerCity als systemd-Dienst auf einem festen
-lokalen Port. Cloudflare Tunnel macht das Ganze über `seiz.ing` erreichbar –
-du musst **keinen weiteren Router-Port freigeben**.
+BurgerCity läuft als systemd-Service auf einem Linux-Server. Cloudflare
+Tunnel veröffentlicht den lokalen Port unter einer Subdomain. Updates
+werden über einen Cron-getriggerten Git-Pull automatisch ausgerollt.
 
-## 1. Code auf den Server kopieren
+## Architektur
+
+```
+GitHub  ──(git pull alle 2 min)──►  Linux-Server
+                                    ├── Express :5174 (Auth + dist/)
+                                    └── systemd: burgercity.service
+                                          │
+                                cloudflared (Tunnel, ausgehend)
+                                          │
+                                  https://burgercity.seiz.ing
+```
+
+## Voraussetzungen
+
+- Linux-Server mit `git`, `curl`, `bash`
+- Node.js (im Projekt: über `nvm`, Pfad in der systemd-Unit pinnen)
+- `cloudflared` als systemd-Service mit konfiguriertem Tunnel
+- Eingehender Port wird **nicht** benötigt (Tunnel arbeitet ausgehend)
+
+## Erst-Setup
+
+### 1. Repository klonen
 
 ```bash
-# z.B.
 mkdir -p /root/Joshua
-rsync -av --exclude node_modules --exclude dist BurgerCity/ root@server:/root/Joshua/BurgerCity/
+cd /root/Joshua
+git clone https://github.com/J0shu4A/BurgerCity.git
+cd BurgerCity
 ```
 
-## 2. Dependencies installieren + Frontend bauen
+### 2. Build
 
 ```bash
-cd /root/Joshua/BurgerCity
-npm run build:prod
-# Dieser Befehl macht:
-#   - npm install              (Frontend-Deps für vite build)
-#   - npm --prefix server install (Express-Deps)
-#   - npm run build            (vite build → dist/)
+bash deploy/redeploy.sh
 ```
 
-## 3. systemd-Service einrichten
+`redeploy.sh` installiert Frontend- und Server-Dependencies, baut das Frontend
+mit Vite und startet den systemd-Service neu.
+
+### 3. systemd-Service installieren
+
+JWT-Secret in `deploy/burgercity.service` durch einen langen Zufallsstring
+ersetzen, dann:
 
 ```bash
-# 1. JWT_SECRET in der Unit-Datei durch einen langen Zufallsstring ersetzen!
-nano /root/Joshua/BurgerCity/deploy/burgercity.service
-
-# 2. Unit aktivieren
-cp /root/Joshua/BurgerCity/deploy/burgercity.service /etc/systemd/system/
+cp deploy/burgercity.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable burgercity
-systemctl start burgercity
-
-# 3. Status / Logs prüfen
+systemctl enable --now burgercity
 systemctl status burgercity
-tail -f /var/log/burgercity.log
 ```
 
-Lokaler Test:
+Healthcheck:
 
 ```bash
 curl http://127.0.0.1:5174/health
 # → {"ok":true}
 ```
 
-## 4. Cloudflare Tunnel: zweite Route hinzufügen
+### 4. Cloudflare-Tunnel-Route
 
-Du hast schon einen Tunnel laufen, der `seiz.ing` → `localhost:8000` (FastAPI)
-weiterleitet. Du brauchst nur eine zweite Route auf den BurgerCity-Port.
+Im Zero-Trust-Dashboard eine zusätzliche Public-Hostname-Route am
+bestehenden Tunnel anlegen:
 
-### Variante A – Cloudflare-Dashboard (Zero Trust)
+| Feld     | Wert                  |
+|----------|-----------------------|
+| Subdomain| `burgercity`          |
+| Domain   | `seiz.ing`            |
+| Service  | `http://localhost:5174` |
 
-1. Zero Trust → Networks → Tunnels → deinen Tunnel auswählen → **Public Hostname**
-2. **Add a public hostname**
-   - Subdomain: `burgercity` (oder wie du willst)
-   - Domain: `seiz.ing`
-   - Service: **HTTP**, URL: `localhost:5174`
-3. Speichern. Nach ~30 s ist `https://burgercity.seiz.ing` erreichbar.
-
-### Variante B – `~/.cloudflared/config.yml` (falls du den Tunnel in einer YAML hast)
+Alternativ in `~/.cloudflared/config.yml`:
 
 ```yaml
-tunnel: <DEINE-TUNNEL-ID>
-credentials-file: /root/.cloudflared/<DEINE-TUNNEL-ID>.json
-
 ingress:
-  - hostname: seiz.ing
-    service: http://localhost:8000
-  - hostname: burgercity.seiz.ing       # NEU
-    service: http://localhost:5174       # NEU
+  - hostname: burgercity.seiz.ing
+    service: http://localhost:5174
   - service: http_status:404
 ```
 
-Danach:
+## Automatischer Deploy (Cron-Pull)
+
+Logfile vorbereiten:
+
 ```bash
-systemctl restart cloudflared
+touch /var/log/burgercity-cron.log
+chmod 644 /var/log/burgercity-cron.log
 ```
 
-## 5. Login testen
-
-`https://burgercity.seiz.ing` → User `admin`, Passwort `eroglu2026`.
-
-## Updates ausrollen
+Cron-Job hinzufügen:
 
 ```bash
-cd /root/Joshua/BurgerCity
-git pull              # oder rsync neu
-npm run build:prod    # rebuild
+(crontab -l 2>/dev/null; echo "*/2 * * * * bash /root/Joshua/BurgerCity/deploy/auto-pull.sh") | crontab -
+```
+
+`auto-pull.sh` arbeitet wie folgt:
+
+1. Single-Instance-Lock setzen (`flock`)
+2. `git fetch origin main`
+3. Lokalen HEAD mit `origin/main` vergleichen — bei Gleichheit beenden
+4. `git reset --hard origin/main`
+5. `bash deploy/redeploy.sh` (install + build + restart)
+6. Healthcheck via `curl /health`
+7. Alles in `/var/log/burgercity-cron.log` protokollieren
+
+Bei einem fehlgeschlagenen Build bleibt der laufende Service auf der alten
+`dist/` und damit auf der vorherigen Version.
+
+## Service-Management
+
+```bash
+systemctl status burgercity
 systemctl restart burgercity
+journalctl -u burgercity -n 50
+
+tail -f /var/log/burgercity.log         # App-Logs
+tail -f /var/log/burgercity.err.log     # App-Fehler
+tail -f /var/log/burgercity-cron.log    # Deploy-Logs
 ```
 
-## Lokaler Dev (Windows) bleibt unverändert
+Manueller Deploy ohne auf den Cron zu warten:
 
-```powershell
-# Terminal 1
-cd BurgerCity\server
-npm run dev
-
-# Terminal 2
-cd BurgerCity
-npm run dev
+```bash
+bash /root/Joshua/BurgerCity/deploy/auto-pull.sh
 ```
 
-`.env.development` setzt `VITE_API_BASE=http://localhost:5174`, sodass das
-Vite-Frontend auf 5173 weiterhin auf den lokalen Express trifft. Production
-auf dem Linux-Server hat keine `.env.production` → leerer API_BASE → same-origin.
+Auto-Deploy temporär deaktivieren: `crontab -e` und die Zeile
+auskommentieren oder entfernen.
+
+## Update-Workflow
+
+```bash
+# Lokal
+git push origin main
+# Server holt die Änderung beim nächsten Cron-Lauf (≤ 2 min) automatisch ab.
+```
+
+## Lokale Entwicklung
+
+Setup auf der Entwickler-Maschine ist unabhängig vom Server. Siehe
+[Root-README](../README.md) → Abschnitt „Entwicklung".

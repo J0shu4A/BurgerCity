@@ -1,3 +1,7 @@
+// Parst Datei-Uploads (CSV via PapaParse, XLSX via SheetJS) und bringt die
+// Felder in das einheitliche Fact-Format, mit dem das Dashboard arbeitet.
+// Spaltennamen werden tolerant gemappt (deutsch / englisch / mit Sonderzeichen).
+
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 
