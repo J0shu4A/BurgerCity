@@ -11,6 +11,7 @@ import ChartTabs from "./components/ChartTabs";
 import HourRevenueChart from "./components/HourRevenueChart";
 import TopProductsChart from "./components/TopProductsChart";
 import StoreRanking from "./components/StoreRanking";
+import ProductCompareChart from "./components/ProductCompareChart";
 import BundlesChart from "./components/BundlesChart";
 import InsightsPanel from "./components/InsightsPanel";
 import ExportButtons from "./components/ExportButtons";
@@ -216,6 +217,14 @@ export default function App() {
   const facts = useMemo(
     () => filterFacts(factsRaw, { store, product, fromDate, toDate }),
     [factsRaw, store, product, fromDate, toDate]
+  );
+
+  // Für Produkt-Vergleich: Filiale + Zeitraum gelten weiter, aber Produkt-Filter
+  // wird ignoriert (sonst gäbe es nie Daten für Produkt B, wenn der globale
+  // Produkt-Filter auf A steht).
+  const factsForCompare = useMemo(
+    () => filterFacts(factsRaw, { store, fromDate, toDate }),
+    [factsRaw, store, fromDate, toDate]
   );
 
   const kpis = useMemo(() => computeKpis(facts), [facts]);
@@ -742,6 +751,12 @@ export default function App() {
               {activeChart === "products" && (
                 <div className="chartSlot">
                   <TopProductsChart data={chartProducts} />
+                </div>
+              )}
+
+              {activeChart === "compare" && (
+                <div className="chartSlot">
+                  <ProductCompareChart facts={factsForCompare} />
                 </div>
               )}
 

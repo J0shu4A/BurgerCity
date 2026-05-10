@@ -4,6 +4,7 @@ export default function ChartTabs({ active, onChange }) {
     { id: "hour", label: "Trend (Stunde)" },
     { id: "year", label: "Jahresumsätze" }, // ✅ NEU
     { id: "products", label: "Produkte" },
+    { id: "compare", label: "Produkt-Vergleich" },
     { id: "stores", label: "Filialen" },
     { id: "bundles", label: "Bundles" },
     { id: "forecast", label: "Forecast" },
